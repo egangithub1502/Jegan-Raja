@@ -33,12 +33,11 @@ jobs:
             const commonUser = 'egangithub1502';
             
             if (isApproved && isReviewed && assignedUsers.includes(commonUser)) {
-              core.setOutput('merge', 'true');
+              return { merge: true };
             } else {
-              core.setOutput('merge', 'false');
+              return { merge: false };
             }
-          env:
-            GITHUB_TOKEN: ${{ secrets.JEGANTOKEN }}
+          github-token: ${{ secrets.JEGANTOKEN }}
 
       - name: Merge PR
         if: steps.check_conditions.outputs.merge == 'true'
@@ -51,5 +50,4 @@ jobs:
               pull_number: context.issue.number,
               commit_message: 'Automerge by GitHub Actions'
             });
-          env:
-            GITHUB_TOKEN: ${{ secrets.JEGANTOKEN }}
+          github-token: ${{ secrets.JEGANTOKEN }}
