@@ -30,12 +30,12 @@ jobs:
             const commonUser = 'egangithub1502';
             
             if (isApproved && isReviewed && assignedUsers.includes(commonUser)) {
-              return 'merge';
+              return true;  # Triggers merge
             } else {
-              return 'do-not-merge';
+              return false; # Does nothing
             }
-          github-token: ${{ secrets.JEGANTOKEN }}
-          debug: true  # For debugging purposes
+          github-token: ${{ secrets.JEGANTOKEN }}  # Assuming a PAT with necessary permissions
+          debug: true
           user-agent: actions/github-script
           result-encoding: json
           retries: 0
