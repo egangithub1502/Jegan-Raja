@@ -26,8 +26,6 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const { context, github } = require('@actions/github');
-
             try {
               // Get pull request details
               const pr = await github.rest.pulls.get({
