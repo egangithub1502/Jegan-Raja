@@ -1,29 +1,15 @@
-name: automerge
+name: Automerge if conditions are met
+
 on:
   pull_request:
-    types:
-      - labeled
-      - unlabeled
-      - synchronize
-      - opened
-      - edited
-      - ready_for_review
-      - reopened
-      - unlocked
-  pull_request_review:
-    types:
-      - submitted
-  check_suite:
-    types:
-      - completed
+    types: [opened, reopened, synchronize]
 
 jobs:
   automerge:
     runs-on: ubuntu-latest
     steps:
-      - name: Check for review, approval, and assignment
-        id: check_conditions
-        uses: actions/github-script@v6
+      - uses: actions/checkout@v3
+      - uses: actions/github-script@v6
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -31,26 +17,26 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-
+            
             const reviews = await github.rest.pulls.listReviews({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-
+            
             const isApproved = reviews.data.some(review => review.state === 'APPROVED');
             const isReviewed = reviews.data.length > 0;
             const assignedUsers = pr.data.assignees.map(a => a.login);
-            const commonUser = 'egangithub1502'; // replace with the actual username
-
+            const commonUser = 'egangithub1502';
+            
             if (isApproved && isReviewed && assignedUsers.includes(commonUser)) {
               return 'merge';
             } else {
               return 'do-not-merge';
             }
-
-      - name: Automerge if conditions are met
-        if: steps.check_conditions.outputs.result == 'merge'
-        uses: pascalgn/automerge-action@v0.16.3
-        env:
-          GITHUB_TOKEN: ${{ secrets.JEGANTOKEN }}
+          github-token: ${{ secrets.JEGANTOKEN }}
+          debug: true  # For debugging purposes
+          user-agent: actions/github-script
+          result-encoding: json
+          retries: 0
+          retry-exempt-status-codes: 400,401,403,404,422
