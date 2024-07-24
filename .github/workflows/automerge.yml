@@ -26,38 +26,31 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            try {
-              // Get pull request details
-              const pr = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number
-              });
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
 
-              // Get reviews
-              const reviews = await github.rest.pulls.listReviews({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number
-              });
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
 
-              const isApproved = reviews.data.some(review => review.state === 'APPROVED');
-              const isReviewed = reviews.data.length > 0;
-              const assignedUsers = pr.data.assignees.map(a => a.login);
-              const commonUser = 'egangithub1502'; // replace with the actual username
+            const isApproved = reviews.data.some(review => review.state === 'APPROVED');
+            const isReviewed = reviews.data.length > 0;
+            const assignedUsers = pr.data.assignees.map(a => a.login);
+            const commonUser = 'egangithub1502'; // replace with the actual username
 
-              if (isApproved && isReviewed && assignedUsers.includes(commonUser)) {
-                return { result: 'merge' };
-              } else {
-                return { result: 'do-not-merge' };
-              }
-            } catch (error) {
-              console.error('Error checking conditions:', error);
-              return { result: 'error' };
+            if (isApproved && isReviewed && assignedUsers.includes(commonUser)) {
+              return 'merge';
+            } else {
+              return 'do-not-merge';
             }
 
       - name: Automerge if conditions are met
         if: steps.check_conditions.outputs.result == 'merge'
         uses: pascalgn/automerge-action@v0.16.3
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.JEGANTOKEN }}
