@@ -9,7 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/github-script@v6
+
+      - name: Check PR conditions
+        id: check_conditions
+        uses: actions/github-script@v6
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -30,13 +33,21 @@ jobs:
             const commonUser = 'egangithub1502';
             
             if (isApproved && isReviewed && assignedUsers.includes(commonUser)) {
-              return true;  # Triggers merge
+              return { merge: true };
             } else {
-              return false; # Does nothing
+              return { merge: false };
             }
-          github-token: ${{ secrets.JEGANTOKEN }}  # Assuming a PAT with necessary permissions
-          debug: true
-          user-agent: actions/github-script
-          result-encoding: json
-          retries: 0
-          retry-exempt-status-codes: 400,401,403,404,422
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge PR
+        if: steps.check_conditions.outputs.merge == 'true'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              commit_message: 'Automerge by GitHub Actions'
+            });
+          github-token: ${{ secrets.JEGANTOKEN }}
