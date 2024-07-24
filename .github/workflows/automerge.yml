@@ -37,7 +37,7 @@ jobs:
             } else {
               return { merge: false };
             }
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.JEGANTOKEN }}
 
       - name: Merge PR
         if: steps.check_conditions.outputs.merge == 'true'
