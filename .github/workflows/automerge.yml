@@ -26,11 +26,13 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-            
+
             const isApproved = reviews.data.some(review => review.state === 'APPROVED');
             const isReviewed = reviews.data.length > 0;
             const assignedUsers = pr.data.assignees.map(a => a.login);
             const commonUser = 'egangithub1502';
+            
+            console.log(`PR ${context.issue.number} - Approved: ${isApproved}, Reviewed: ${isReviewed}, Assigned: ${assignedUsers}`);
             
             if (isApproved && isReviewed && assignedUsers.includes(commonUser)) {
               return { merge: true };
@@ -45,10 +47,15 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            await github.rest.pulls.merge({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-              commit_message: 'Automerge by GitHub Actions'
-            });
+            try {
+              const response = await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                commit_message: 'Automerge by GitHub Actions'
+              });
+              console.log('Merge response:', response);
+            } catch (error) {
+              console.error('Merge error:', error);
+            }
           github-token: ${{ secrets.JEGANTOKEN }}
