@@ -20,16 +20,29 @@ jobs:
     - name: Authenticate GitHub CLI
       run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
 
-    - name: Check pull request review status
-      id: check_reviews
+    - name: Wait for pull request approval
+      id: wait_for_approval
       run: |
         pr_number=${{ github.event.pull_request.number }}
-        review_status=$(gh pr view $pr_number --json reviews --jq '.reviews[] | select(.state == "APPROVED")' || echo "")
-        
-        if [ -z "$review_status" ]; then
-          echo "No approved reviews yet."
-          exit 1
-        fi
+        timeout=600  # Time to wait in seconds (10 minutes)
+        interval=10  # Interval between checks in seconds
+        elapsed=0
+
+        while [ $elapsed -lt $timeout ]; do
+          review_status=$(gh pr view $pr_number --json reviews --jq '.reviews[] | select(.state == "APPROVED")' || echo "")
+          
+          if [ -n "$review_status" ]; then
+            echo "Pull request has been approved."
+            exit 0
+          fi
+
+          echo "Waiting for approval..."
+          sleep $interval
+          elapsed=$((elapsed + interval))
+        done
+
+        echo "Timeout reached. No approval received."
+        exit 1
 
     - name: Merge pull request
       if: success()
