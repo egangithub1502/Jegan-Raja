@@ -1,80 +1,44 @@
-name: Automerge if conditions are met
+name: Auto Merge PR
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, edited]
+    types: [opened, synchronize, reopened]
 
 jobs:
-  automerge:
+  merge:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Check PR conditions
-        id: check_conditions
+      - name: Check PR Status
+        id: check_pr
         uses: actions/github-script@v6
         with:
           script: |
-            try {
-              const pr = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number
-              });
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
 
-              const reviews = await github.rest.pulls.listReviews({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number
-              });
+            const approved = pr.reviews.some(review => review.state === 'APPROVED');
+            const reviewed = pr.reviews.length > 0;
+            const mergeable = pr.mergeable;
 
-              const isApproved = reviews.data.some(review => review.state === 'APPROVED');
-              const isReviewed = reviews.data.length > 0;
-              const assignedUsers = pr.data.assignees.map(a => a.login);
-              const commonUser = 'egangithub1502';
+            console.log(`PR ${pr.number} - Approved: ${approved}, Reviewed: ${reviewed}, Mergeable: ${mergeable}`);
 
-              console.log(`PR ${context.issue.number} - Approved: ${isApproved}, Reviewed: ${isReviewed}, Assigned: ${assignedUsers}`);
-              console.log('PR Details:', JSON.stringify(pr.data, null, 2));
-              console.log('Reviews:', JSON.stringify(reviews.data, null, 2));
-
-              const merge = isApproved && isReviewed && assignedUsers.includes(commonUser);
-              console.log(`Should merge: ${merge}`);
-
-              return { merge: merge.toString() };
-            } catch (error) {
-              console.error('Error in check_conditions:', error);
-              return { merge: 'false' }; // Default to not merging in case of error
-            }
-          github-token: ${{ secrets.JEGANTOKEN }}
-
-      - name: Debug Output
-        run: |
-          echo "Merge condition: ${{ steps.check_conditions.outputs.merge }}"
-
-      - name: Wait for PR to be reviewed and approved
-        if: steps.check_conditions.outputs.merge == 'false'
-        uses: actions/github-script@v6
-        with:
-          script: |
-            // Implement a wait function to pause the workflow until the PR is reviewed and approved
-            console.log('Waiting for PR review and approval...');
-            // This is a placeholder. In real scenarios, implement a proper waiting mechanism.
-          github-token: ${{ secrets.JEGANTOKEN }}
+            return {
+              should_merge: approved && reviewed && mergeable
+            };
 
       - name: Merge PR
-        if: steps.check_conditions.outputs.merge == 'true'
+        if: steps.check_pr.outputs.should_merge == 'true'
         uses: actions/github-script@v6
         with:
           script: |
-            try {
-              const response = await github.rest.pulls.merge({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number,
-                commit_message: 'Automerge by GitHub Actions'
-              });
-              console.log('Merge response:', response);
-            } catch (error) {
-              console.error('Merge error:', error);
-            }
-          github-token: ${{ secrets.JEGANTOKEN }}
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
