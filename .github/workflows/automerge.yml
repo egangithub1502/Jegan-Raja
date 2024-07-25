@@ -33,12 +33,17 @@ jobs:
             const commonUser = 'egangithub1502';
             
             console.log(`PR ${context.issue.number} - Approved: ${isApproved}, Reviewed: ${isReviewed}, Assigned: ${assignedUsers}`);
-            console.log('PR Details:', pr);
-            console.log('Reviews:', reviews);
+            console.log('PR Details:', JSON.stringify(pr.data, null, 2));
+            console.log('Reviews:', JSON.stringify(reviews.data, null, 2));
 
-            // Temporary bypass to ensure merge step is tested
-            return { merge: true };
+            const merge = isApproved && isReviewed && assignedUsers.includes(commonUser);
+            console.log(`Should merge: ${merge}`);
+
+            return { merge: merge.toString() };
           github-token: ${{ secrets.JEGANTOKEN }}
+
+      - name: Debug Output
+        run: echo "Merge condition: ${{ steps.check_conditions.outputs.merge }}"
 
       - name: Merge PR
         if: steps.check_conditions.outputs.merge == 'true'
