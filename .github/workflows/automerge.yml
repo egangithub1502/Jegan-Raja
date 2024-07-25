@@ -1,39 +1,46 @@
-name: Auto Merge PR
+name: Automerge if conditions are met
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, reopened, synchronize]
 
 jobs:
-  merge:
+  automerge:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Check PR Status
-        id: check_pr
+      - name: Check PR conditions
+        id: check_conditions
         uses: actions/github-script@v6
         with:
           script: |
-            const { data: pr } = await github.rest.pulls.get({
+            const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: context.issue.number,
+              pull_number: context.issue.number
             });
-
-            const approved = pr.reviews.some(review => review.state === 'APPROVED');
-            const reviewed = pr.reviews.length > 0;
-            const mergeable = pr.mergeable;
-
-            console.log(`PR ${pr.number} - Approved: ${approved}, Reviewed: ${reviewed}, Mergeable: ${mergeable}`);
-
-            return {
-              should_merge: approved && reviewed && mergeable
-            };
+            
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            const isApproved = reviews.data.some(review => review.state === 'APPROVED');
+            const isReviewed = reviews.data.length > 0;
+            const assignedUsers = pr.data.assignees.map(a => a.login);
+            const commonUser = 'egangithub1502';
+            
+            if (isApproved && isReviewed && assignedUsers.includes(commonUser)) {
+              return { merge: true };
+            } else {
+              return { merge: false };
+            }
+          github-token: ${{ secrets.JEGANTOKEN }}
 
       - name: Merge PR
-        if: steps.check_pr.outputs.should_merge == 'true'
+        if: steps.check_conditions.outputs.merge == 'true'
         uses: actions/github-script@v6
         with:
           script: |
@@ -41,4 +48,6 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number,
+              commit_message: 'Automerge by GitHub Actions'
             });
+          github-token: ${{ secrets.JEGANTOKEN }}
