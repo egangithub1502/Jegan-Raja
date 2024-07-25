@@ -1,30 +1,51 @@
-name: automerge
+name: Auto Merge
+
 on:
   pull_request:
-    types:
-      - labeled
-      - unlabeled
-      - synchronize
-      - opened
-      - edited
-      - ready_for_review
-      - reopened
-      - unlocked
-  pull_request_review:
-    types:
-      - submitted
-  check_suite:
-    types:
-      - completed
-  status: {}
+    types: [review_requested, reviewed]
+
 jobs:
-  automerge:
+  auto-merge:
     runs-on: ubuntu-latest
+
     steps:
-      - id: automerge
-        name: automerge
-        uses: "pascalgn/automerge-action@v0.16.3"
-        permissions:
-          contents: write
-        env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install GitHub CLI
+      run: |
+        sudo apt-get update
+        sudo apt-get install gh
+
+    - name: Authenticate GitHub CLI
+      run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
+
+    - name: Wait for pull request approval
+      id: wait_for_approval
+      run: |
+        pr_number=${{ github.event.pull_request.number }}
+        timeout=600  # Time to wait in seconds (10 minutes)
+        interval=10  # Interval between checks in seconds
+        elapsed=0
+
+        while [ $elapsed -lt $timeout ]; do
+          review_status=$(gh pr view $pr_number --json reviews --jq '.reviews[] | select(.state == "APPROVED")' || echo "")
+          
+          if [ -n "$review_status" ]; then
+            echo "Pull request has been approved."
+            exit 0
+          fi
+
+          echo "Waiting for approval..."
+          sleep $interval
+          elapsed=$((elapsed + interval))
+        done
+
+        echo "Timeout reached. No approval received."
+        exit 1
+
+    - name: Merge pull request
+      if: success()
+      run: |
+        pr_number=${{ github.event.pull_request.number }}
+        gh pr merge $pr_number --merge --admin
