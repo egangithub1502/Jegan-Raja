@@ -43,8 +43,6 @@ jobs:
               core.setOutput('merge', 'false');
             }
           github-token: ${{ secrets.JEGANTOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.JEGANTOKEN }}
 
       - name: Debug Output
         run: echo "Merge Output: ${{ steps.check_conditions.outputs.merge }}"
@@ -62,5 +60,3 @@ jobs:
             });
             console.log('Pull request merged');
           github-token: ${{ secrets.JEGANTOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.JEGANTOKEN }}
