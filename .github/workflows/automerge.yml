@@ -2,7 +2,7 @@ name: Automerge if conditions are met
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, edited]
 
 jobs:
   automerge:
@@ -32,7 +32,7 @@ jobs:
               const isReviewed = reviews.data.length > 0;
               const assignedUsers = pr.data.assignees.map(a => a.login);
               const commonUser = 'egangithub1502';
-              
+
               console.log(`PR ${context.issue.number} - Approved: ${isApproved}, Reviewed: ${isReviewed}, Assigned: ${assignedUsers}`);
               console.log('PR Details:', JSON.stringify(pr.data, null, 2));
               console.log('Reviews:', JSON.stringify(reviews.data, null, 2));
@@ -51,6 +51,16 @@ jobs:
         run: |
           echo "Merge condition: ${{ steps.check_conditions.outputs.merge }}"
 
+      - name: Wait for PR to be reviewed and approved
+        if: steps.check_conditions.outputs.merge == 'false'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            // Implement a wait function to pause the workflow until the PR is reviewed and approved
+            console.log('Waiting for PR review and approval...');
+            // This is a placeholder. In real scenarios, implement a proper waiting mechanism.
+          github-token: ${{ secrets.JEGANTOKEN }}
+
       - name: Merge PR
         if: steps.check_conditions.outputs.merge == 'true'
         uses: actions/github-script@v6
@@ -67,4 +77,4 @@ jobs:
             } catch (error) {
               console.error('Merge error:', error);
             }
-          github-token: ${{ secrets.JEGANTOKEN }}  # Ensure correct indentation here
+          github-token: ${{ secrets.JEGANTOKEN }}
