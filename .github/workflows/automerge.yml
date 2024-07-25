@@ -15,35 +15,41 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            
-            const reviews = await github.rest.pulls.listReviews({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
+            try {
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              });
 
-            const isApproved = reviews.data.some(review => review.state === 'APPROVED');
-            const isReviewed = reviews.data.length > 0;
-            const assignedUsers = pr.data.assignees.map(a => a.login);
-            const commonUser = 'egangithub1502';
-            
-            console.log(`PR ${context.issue.number} - Approved: ${isApproved}, Reviewed: ${isReviewed}, Assigned: ${assignedUsers}`);
-            console.log('PR Details:', JSON.stringify(pr.data, null, 2));
-            console.log('Reviews:', JSON.stringify(reviews.data, null, 2));
+              const reviews = await github.rest.pulls.listReviews({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              });
 
-            const merge = isApproved && isReviewed && assignedUsers.includes(commonUser);
-            console.log(`Should merge: ${merge}`);
+              const isApproved = reviews.data.some(review => review.state === 'APPROVED');
+              const isReviewed = reviews.data.length > 0;
+              const assignedUsers = pr.data.assignees.map(a => a.login);
+              const commonUser = 'egangithub1502';
+              
+              console.log(`PR ${context.issue.number} - Approved: ${isApproved}, Reviewed: ${isReviewed}, Assigned: ${assignedUsers}`);
+              console.log('PR Details:', JSON.stringify(pr.data, null, 2));
+              console.log('Reviews:', JSON.stringify(reviews.data, null, 2));
 
-            return { merge: merge.toString() };
+              const merge = isApproved && isReviewed && assignedUsers.includes(commonUser);
+              console.log(`Should merge: ${merge}`);
+
+              return { merge: merge.toString() };
+            } catch (error) {
+              console.error('Error in check_conditions:', error);
+              return { merge: 'false' }; // Default to not merging in case of error
+            }
           github-token: ${{ secrets.JEGANTOKEN }}
 
       - name: Debug Output
-        run: echo "Merge condition: ${{ steps.check_conditions.outputs.merge }}"
+        run: |
+          echo "Merge condition: ${{ steps.check_conditions.outputs.merge }}"
 
       - name: Merge PR
         if: steps.check_conditions.outputs.merge == 'true'
@@ -61,4 +67,4 @@ jobs:
             } catch (error) {
               console.error('Merge error:', error);
             }
-          github-token: ${{ secrets.JEGANTOKEN }}
+          github-token: ${{ secrets.JEGANTOKEN }}  # Ensure correct indentation here
