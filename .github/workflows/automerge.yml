@@ -37,6 +37,7 @@ jobs:
             } else {
               return { merge: false };
             }
+          result-encoding: string
           github-token: ${{ secrets.JEGANTOKEN }}
 
       - name: Merge PR
