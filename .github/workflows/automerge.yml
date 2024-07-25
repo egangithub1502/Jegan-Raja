@@ -1,53 +1,35 @@
-name: Automerge if conditions are met
+name: Auto Merge
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [review_requested, reviewed]
 
 jobs:
-  automerge:
+  auto-merge:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Check PR conditions
-        id: check_conditions
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            
-            const reviews = await github.rest.pulls.listReviews({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            
-            const isApproved = reviews.data.some(review => review.state === 'APPROVED');
-            const isReviewed = reviews.data.length > 0;
-            const assignedUsers = pr.data.assignees.map(a => a.login);
-            const commonUser = 'egangithub1502';
-            
-            if (isApproved && isReviewed && assignedUsers.includes(commonUser)) {
-              return { merge: true };
-            } else {
-              return { merge: false };
-            }
-          github-token: ${{ secrets.JEGANTOKEN }}
+    - name: Set up GitHub CLI
+      uses: cli/cli@v2
+      with:
+        github_token: ${{ secrets.JEGANTOKEN }}
 
-      - name: Merge PR
-        if: steps.check_conditions.outputs.merge == 'true'
-        uses: actions/github-script@v6
-        with:
-          script: |
-            await github.rest.pulls.merge({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-              commit_message: 'Automerge by GitHub Actions'
-            });
-          github-token: ${{ secrets.JEGANTOKEN }}
+    - name: Check pull request review status
+      id: check_reviews
+      run: |
+        pr_number=${{ github.event.pull_request.number }}
+        review_status=$(gh pr view $pr_number --json reviews --jq '.reviews[] | select(.state == "APPROVED")' || echo "")
+        
+        if [ -z "$review_status" ]; then
+          echo "No approved reviews yet."
+          exit 1
+        fi
+
+    - name: Merge pull request
+      if: success()
+      run: |
+        pr_number=${{ github.event.pull_request.number }}
+        gh pr merge $pr_number --merge --admin
