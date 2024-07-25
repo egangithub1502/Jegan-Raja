@@ -1,0 +1,3 @@
+assignees Variable: Fetches the list of users assigned to the pull request.
+grep -q: Searches for target_user in the list of assignees. If found, the script proceeds with the merge.
+Exit Conditions: The script exits with status 0 if both conditions are met and 1 if the timeout is reached without meeting the conditions.
