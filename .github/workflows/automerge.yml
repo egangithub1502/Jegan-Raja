@@ -20,28 +20,30 @@ jobs:
     - name: Authenticate GitHub CLI
       run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
 
-    - name: Wait for pull request approval
-      id: wait_for_approval
+    - name: Wait for pull request approval and check assignment
+      id: wait_for_approval_and_check_assignment
       run: |
         pr_number=${{ github.event.pull_request.number }}
+        target_user="egangithub1502"
         timeout=600  # Time to wait in seconds (10 minutes)
         interval=10  # Interval between checks in seconds
         elapsed=0
 
         while [ $elapsed -lt $timeout ]; do
           review_status=$(gh pr view $pr_number --json reviews --jq '.reviews[] | select(.state == "APPROVED")' || echo "")
-          
-          if [ -n "$review_status" ]; then
-            echo "Pull request has been approved."
+          assignees=$(gh pr view $pr_number --json assignees --jq '.assignees[].login' || echo "")
+
+          if [ -n "$review_status" ] && echo "$assignees" | grep -q "$target_user"; then
+            echo "Pull request has been approved and assigned to $target_user."
             exit 0
           fi
 
-          echo "Waiting for approval..."
+          echo "Waiting for approval and assignment..."
           sleep $interval
           elapsed=$((elapsed + interval))
         done
 
-        echo "Timeout reached. No approval received."
+        echo "Timeout reached. No approval or incorrect assignment."
         exit 1
 
     - name: Merge pull request
