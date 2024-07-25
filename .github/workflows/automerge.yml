@@ -8,7 +8,8 @@ jobs:
   automerge:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Check PR conditions
         id: check_conditions
@@ -32,12 +33,21 @@ jobs:
             const assignedUsers = pr.data.assignees.map(a => a.login);
             const commonUser = 'egangithub1502';
             
+            console.log(`isApproved: ${isApproved}`);
+            console.log(`isReviewed: ${isReviewed}`);
+            console.log(`assignedUsers: ${assignedUsers}`);
+            
             if (isApproved && isReviewed && assignedUsers.includes(commonUser)) {
-              return { merge: true };
+              core.setOutput('merge', 'true');
             } else {
-              return { merge: false };
+              core.setOutput('merge', 'false');
             }
           github-token: ${{ secrets.JEGANTOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.JEGANTOKEN }}
+
+      - name: Debug Output
+        run: echo "Merge Output: ${{ steps.check_conditions.outputs.merge }}"
 
       - name: Merge PR
         if: steps.check_conditions.outputs.merge == 'true'
@@ -50,4 +60,7 @@ jobs:
               pull_number: context.issue.number,
               commit_message: 'Automerge by GitHub Actions'
             });
+            console.log('Pull request merged');
           github-token: ${{ secrets.JEGANTOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.JEGANTOKEN }}
