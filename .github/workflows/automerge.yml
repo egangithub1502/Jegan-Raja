@@ -26,7 +26,7 @@ jobs:
         pr_number=${{ github.event.pull_request.number }}
         pr_state=$(gh pr view $pr_number --json state --jq '.state')
         
-        echo "Pull request state: $pr_state"
+        echo "Initial pull request state: $pr_state"
         if [ "$pr_state" == "closed" ]; then
           echo "Pull request is closed. Exiting workflow."
           exit 0
@@ -38,6 +38,7 @@ jobs:
         pr_number=${{ github.event.pull_request.number }}
         conflict_status=$(gh pr view $pr_number --json mergeable --jq '.mergeable')
         
+        echo "Mergeable state: $conflict_status"
         if [ "$conflict_status" == "CONFLICTING" ]; then
           echo "Merge conflict detected."
           gh pr comment $pr_number --body "Your pull request has merge conflicts. Please resolve them before continuing."
@@ -84,6 +85,9 @@ jobs:
           review_status=$(gh pr view $pr_number --json reviews --jq '.reviews[] | select(.state == "APPROVED")' || echo "")
           assignees=$(gh pr view $pr_number --json assignees --jq '.assignees[].login' || echo "")
           
+          echo "Review status: $review_status"
+          echo "Assignees: $assignees"
+
           if [ -n "$review_status" ] && echo "$assignees" | grep -q "$target_user"; then
             echo "Pull request has been approved and assigned to $target_user."
             exit 0
@@ -119,7 +123,7 @@ jobs:
         pr_number=${{ github.event.pull_request.number }}
         pr_state=$(gh pr view $pr_number --json state --jq '.state')
         
-        echo "Pull request state: $pr_state"
+        echo "Pull request state before merge: $pr_state"
         if [ "$pr_state" == "closed" ]; then
           echo "Pull request is closed. Exiting workflow."
           exit 0
