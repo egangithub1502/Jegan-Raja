@@ -32,6 +32,7 @@ jobs:
           exit 1
         else
           echo "No merge conflicts."
+          gh pr comment $pr_number --body "Your pull request has no merge conflicts."
           exit 0
         fi
 
