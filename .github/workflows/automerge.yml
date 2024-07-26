@@ -79,7 +79,7 @@ jobs:
           echo "Pull request state: $pr_state"
           if [ "$pr_state" == "closed" ]; then
             echo "Pull request is closed. Exiting workflow."
-            break
+            exit 0
           fi
 
           review_status=$(gh pr view $pr_number --json reviews --jq '.reviews[] | select(.state == "APPROVED")' || echo "")
@@ -97,10 +97,6 @@ jobs:
           sleep $interval
           elapsed=$((elapsed + interval))
         done
-
-        if [ "$pr_state" == "closed" ]; then
-          exit 0
-        fi
 
         echo "Timeout reached. No approval or incorrect assignment."
         exit 1
