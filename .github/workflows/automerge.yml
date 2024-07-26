@@ -26,6 +26,7 @@ jobs:
         pr_number=${{ github.event.pull_request.number }}
         pr_state=$(gh pr view $pr_number --json state --jq '.state')
         
+        echo "Pull request state: $pr_state"
         if [ "$pr_state" == "closed" ]; then
           echo "Pull request is closed. Exiting workflow."
           exit 0
@@ -74,6 +75,7 @@ jobs:
         while [ $elapsed -lt $timeout ]; do
           pr_state=$(gh pr view $pr_number --json state --jq '.state')
           
+          echo "Pull request state: $pr_state"
           if [ "$pr_state" == "closed" ]; then
             echo "Pull request is closed. Exiting workflow."
             exit 0
@@ -117,6 +119,7 @@ jobs:
         pr_number=${{ github.event.pull_request.number }}
         pr_state=$(gh pr view $pr_number --json state --jq '.state')
         
+        echo "Pull request state: $pr_state"
         if [ "$pr_state" == "closed" ]; then
           echo "Pull request is closed. Exiting workflow."
           exit 0
