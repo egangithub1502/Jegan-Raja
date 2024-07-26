@@ -2,11 +2,42 @@ name: Auto Merge
 
 on:
   pull_request:
-    types: [review_requested, reviewed]
+    types: [opened, synchronize, reopened]
 
 jobs:
-  auto-merge:
+  check-conflicts:
     runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install GitHub CLI
+      run: |
+        sudo apt-get update
+        sudo apt-get install gh
+
+    - name: Authenticate GitHub CLI
+      run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
+
+    - name: Check for merge conflicts
+      id: check_conflicts
+      run: |
+        pr_number=${{ github.event.pull_request.number }}
+        conflict_status=$(gh pr view $pr_number --json mergeableState --jq '.mergeableState')
+        
+        if [ "$conflict_status" == "dirty" ]; then
+          echo "Merge conflict detected."
+          gh pr comment $pr_number --body "Your pull request has merge conflicts. Please resolve them before continuing."
+          exit 1
+        else
+          echo "No merge conflicts."
+          exit 0
+        fi
+
+  wait_for_approval_and_check_assignment:
+    runs-on: ubuntu-latest
+    needs: check-conflicts
 
     steps:
     - name: Checkout code
@@ -32,7 +63,7 @@ jobs:
         while [ $elapsed -lt $timeout ]; do
           review_status=$(gh pr view $pr_number --json reviews --jq '.reviews[] | select(.state == "APPROVED")' || echo "")
           assignees=$(gh pr view $pr_number --json assignees --jq '.assignees[].login' || echo "")
-
+          
           if [ -n "$review_status" ] && echo "$assignees" | grep -q "$target_user"; then
             echo "Pull request has been approved and assigned to $target_user."
             exit 0
@@ -45,6 +76,22 @@ jobs:
 
         echo "Timeout reached. No approval or incorrect assignment."
         exit 1
+
+  merge_pull_request:
+    runs-on: ubuntu-latest
+    needs: wait_for_approval_and_check_assignment
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install GitHub CLI
+      run: |
+        sudo apt-get update
+        sudo apt-get install gh
+
+    - name: Authenticate GitHub CLI
+      run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
 
     - name: Merge pull request
       if: success()
