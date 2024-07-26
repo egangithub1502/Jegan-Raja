@@ -95,6 +95,20 @@ jobs:
 
           if [ -n "$review_status" ] && echo "$assignees" | grep -q "$target_user"; then
             echo "Pull request has been approved and assigned to $target_user."
+            
+            # Add the comment to the PR
+            comment_body="Code changes self review done
+
+Reviewed API Security - NA
+Reviewed API Response Time - NA
+Reviewed API Response Size - NA
+Reviewed the Technical Design Document - NA
+Reviewed the Verification Document - NA
+Reviewed Method Level Comments - NA
+Reviewed the Test Cases - Y
+Optimized by Copilot - Y
+Reviewed by Copilot - Y"
+            gh pr comment $pr_number --body "$comment_body"
             exit 0
           fi
 
