@@ -15,19 +15,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Cache GitHub CLI
-      id: cache-gh-cli
-      uses: actions/cache@v3
-      with:
-        path: /usr/local/bin/gh
-        key: gh-cli-${{ runner.os }}-v2
-
     - name: Install GitHub CLI
-      if: steps.cache-gh-cli.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y gh
-
+        sudo apt-get install gh
     - name: Authenticate GitHub CLI
       run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
 
@@ -38,12 +29,11 @@ jobs:
         pr_state=$(gh pr view $pr_number --json state --jq '.state')
         
         echo "Initial pull request state: $pr_state"
-        echo "pr_state=${pr_state}" >> $GITHUB_ENV
+        echo "::set-output name=pr_state::$pr_state"
         if [ "$pr_state" == "closed" ]; then
           echo "Pull request is closed. Exiting workflow."
           exit 0
         fi
-
     - name: Check for merge conflicts
       id: check_conflicts
       run: |
@@ -59,29 +49,19 @@ jobs:
           echo "No merge conflicts."
           gh pr comment $pr_number --body "Your pull request has no merge conflicts."
         fi
-
   wait_for_approval_and_check_assignment:
     runs-on: ubuntu-latest
     needs: check-conflicts
-    if: env.pr_state != 'closed'
+    if: needs.check-conflicts.outputs.pr_state != 'closed'
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Cache GitHub CLI
-      id: cache-gh-cli
-      uses: actions/cache@v3
-      with:
-        path: /usr/local/bin/gh
-        key: gh-cli-${{ runner.os }}-v2
-
     - name: Install GitHub CLI
-      if: steps.cache-gh-cli.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y gh
-
+        sudo apt-get install gh
     - name: Authenticate GitHub CLI
       run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
 
@@ -116,29 +96,19 @@ jobs:
         done
         echo "Timeout reached. No approval or incorrect assignment."
         exit 1
-
   merge_pull_request:
     runs-on: ubuntu-latest
     needs: wait_for_approval_and_check_assignment
-    if: env.pr_state != 'closed'
+    if: needs.wait_for_approval_and_check_assignment.outputs.pr_state != 'closed'
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Cache GitHub CLI
-      id: cache-gh-cli
-      uses: actions/cache@v3
-      with:
-        path: /usr/local/bin/gh
-        key: gh-cli-${{ runner.os }}-v2
-
     - name: Install GitHub CLI
-      if: steps.cache-gh-cli.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
-        sudo apt-get install -y gh
-
+        sudo apt-get install gh
     - name: Authenticate GitHub CLI
       run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
 
@@ -149,12 +119,10 @@ jobs:
         pr_state=$(gh pr view $pr_number --json state --jq '.state')
         
         echo "Pull request state before merge: $pr_state"
-        echo "pr_state=${pr_state}" >> $GITHUB_ENV
         if [ "$pr_state" == "closed" ]; then
           echo "Pull request is closed. Exiting workflow."
           exit 0
         fi
-
     - name: Merge pull request
       if: success()
       run: |
