@@ -61,7 +61,7 @@ jobs:
         id: wait_for_approval_and_check_assignment
         run: |
           pr_number=${{ github.event.pull_request.number }}
-          target_user="opsuser-profit"
+          target_user="egangithub1502"
           timeout=600  # Time to wait in seconds (10 minutes)
           interval=10  # Interval between checks in seconds
           elapsed=0
