@@ -36,6 +36,7 @@ jobs:
           if [ "$pr_state" == "closed" ]; then
             echo "Pull request is closed. Exiting workflow."
             exit 0
+          fi  # <-- This line was missing
 
       - name: Check for merge conflicts
         id: check_conflicts
@@ -146,9 +147,11 @@ jobs:
           pr_number=${{ github.event.pull_request.number }}
           pr_state=$(gh pr view $pr_number --json state --jq '.state')
           echo "Pull request state before merge: $pr_state"
+          echo "pr_state=$pr_state" >> $GITHUB_ENV
           if [ "$pr_state" == "closed" ]; then
             echo "Pull request is closed. Exiting workflow."
             exit 0
+          fi  # <-- This line was missing
 
       - name: Merge pull request
         if: success()
