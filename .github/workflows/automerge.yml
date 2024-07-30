@@ -12,8 +12,8 @@ jobs:
   check-conflicts:
     runs-on: ubuntu-latest
     outputs:
-      pr_state: '${{ steps.check_closed.outputs.pr_state }}'
-      conflict_detected: '${{ steps.check_conflicts.outputs.conflict_detected }}'
+      pr_state: ${{ steps.check_closed.outputs.pr_state }}
+      conflict_detected: ${{ steps.check_conflicts.outputs.conflict_detected }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -21,10 +21,10 @@ jobs:
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
-          sudo apt-get install gh
+          sudo apt-get install -y gh
 
       - name: Authenticate GitHub CLI
-        run: 'echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token'
+        run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
 
       - name: Check if pull request is closed
         id: check_closed
@@ -32,7 +32,7 @@ jobs:
           pr_number=${{ github.event.pull_request.number }}
           pr_state=$(gh pr view $pr_number --json state --jq '.state')
           echo "Initial pull request state: $pr_state"
-          echo "::set-output name=pr_state::$pr_state"
+          echo "pr_state=$pr_state" >> $GITHUB_ENV
           if [ "$pr_state" == "closed" ]; then
             echo "Pull request is closed. Exiting workflow."
             exit 0
@@ -48,11 +48,11 @@ jobs:
             gh pr comment $pr_number --body "Your pull request has merge conflicts. Please resolve them before continuing."
             creator_email=$(gh pr view $pr_number --json author --jq '.author.email')
             echo "Your pull request has merge conflicts. Please resolve them before continuing." | mail -s "Merge Conflict in Your PR" $creator_email
-            echo "::set-output name=conflict_detected::true"
+            echo "conflict_detected=true" >> $GITHUB_ENV
             exit 1
           else
             echo "No merge conflicts."
-            echo "::set-output name=conflict_detected::false"
+            echo "conflict_detected=false" >> $GITHUB_ENV
 
   disable-approve-and-assign:
     runs-on: ubuntu-latest
@@ -65,10 +65,10 @@ jobs:
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
-          sudo apt-get install gh
+          sudo apt-get install -y gh
 
       - name: Authenticate GitHub CLI
-        run: 'echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token'
+        run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
 
       - name: Disable approve and assign options
         run: |
@@ -87,10 +87,10 @@ jobs:
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
-          sudo apt-get install gh
+          sudo apt-get install -y gh
 
       - name: Authenticate GitHub CLI
-        run: 'echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token'
+        run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
 
       - name: Wait for pull request approval and check assignment
         id: wait_for_approval_and_check_assignment
@@ -113,7 +113,7 @@ jobs:
             echo "Assignees: $assignees"
             if [ -n "$review_status" ] && echo "$assignees" | grep -q "$target_user"; then
               echo "Pull request has been approved and assigned to $target_user."
-              comment_body="Code changes self review done\nReviewed API Security - NA\nReviewed API Response Time - NA\nReviewed API Response Size - NA\nReviewed the Technical Design Document - NA\nReviewed the Verification Document - NA\nReviewed Method Level Comments - NA\nReviewed the Test Cases - Y\nOptimized by Copilot - Y\nReviewed byCopilot - Y"
+              comment_body="Code changes self review done\nReviewed API Security - NA\nReviewed API Response Time - NA\nReviewed API Response Size - NA\nReviewed the Technical Design Document - NA\nReviewed the Verification Document - NA\nReviewed Method Level Comments - NA\nReviewed the Test Cases - Y\nOptimized by Copilot - Y\nReviewed by Copilot - Y"
               gh pr comment $pr_number --body "$comment_body"
               exit 0
             fi
@@ -135,10 +135,10 @@ jobs:
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
-          sudo apt-get install gh
+          sudo apt-get install -y gh
 
       - name: Authenticate GitHub CLI
-        run: 'echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token'
+        run: echo "${{ secrets.JEGANTOKEN }}" | gh auth login --with-token
 
       - name: Check if pull request is closed
         id: check_closed_again
