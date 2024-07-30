@@ -84,8 +84,12 @@ jobs:
             echo "Assignees: $assignees"
             if [ -n "$review_status" ] && echo "$assignees" | grep -q "$target_user"; then
               echo "Pull request has been approved and assigned to $target_user."
-              comment_body="Code changes self review done\nReviewed API Security - NA\nReviewed API Response Time - NA\nReviewed API Response Size - NA\nReviewed the Technical Design Document - NA\nReviewed the Verification Document - NA\nReviewed Method Level Comments - NA\nReviewed the Test Cases - Y\nOptimized by Copilot - Y\nReviewed by Copilot - Y"
-              gh pr comment $pr_number --body "$comment_body"
+              
+              # Extract reviewer names
+              reviewers=$(echo "$review_status" | jq -r '.user.login')
+              review_comment="Code changes self review done\nReviewed API Security - NA\nReviewed API Response Time - NA\nReviewed API Response Size - NA\nReviewed the Technical Design Document - NA\nReviewed the Verification Document - NA\nReviewed Method Level Comments - NA\nReviewed the Test Cases - Y\nOptimized by Copilot - Y\nReviewed by Copilot - Y\n\nApproved by: $reviewers"
+              
+              gh pr comment $pr_number --body "$review_comment"
               exit 0
             fi
             echo "Waiting for approval and assignment..."
