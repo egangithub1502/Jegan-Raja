@@ -142,4 +142,4 @@ jobs:
         if: success()
         run: |
           pr_number=${{ github.event.pull_request.number }}
-          gh pr merge $pr_number --merge --admin
+          gh pr merge $pr_number --merge
