@@ -43,17 +43,13 @@ jobs:
         # Functions
         function fetch_branch() {
           local pattern=$1
-          git branch -r | grep "$pattern" | tail -n 1 | sed 's|origin/||' | xargs
-        }
-
-        function create_pull_request() {
-          local base_branch=$1
-          local head_branch=$2
-          gh pr create --base "$base_branch" --head "$head_branch" --title "Merge $head_branch into $base_branch" --body "Automatic merge from $head_branch into $base_branch"
+          git branch -r | grep "origin/$pattern" | tail -n 1 | sed 's|origin/||' | xargs
         }
 
         # Main Script
         # Step 1: Check out the repo and set up Git
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
         git clone "$REPO_URL" repo
         cd repo || exit
 
@@ -66,14 +62,18 @@ jobs:
           fi
           echo "Found minor branch: $MINOR_BRANCH"
           
-          HF_BRANCH="${GITHUB_REF#refs/heads/}"
-          echo "Found HF branch: $HF_BRANCH"
-          
+          git fetch origin
           git checkout "$MINOR_BRANCH"
           git pull origin "$MINOR_BRANCH"
-          git fetch origin
           
+          HF_BRANCH="${GITHUB_REF#refs/heads/}"
           echo "Merging $HF_BRANCH into $MINOR_BRANCH"
+          
+          # Check if the HF branch exists locally; if not, fetch it
+          if ! git show-ref --quiet "refs/heads/$HF_BRANCH"; then
+            git fetch origin "$HF_BRANCH:$HF_BRANCH"
+          fi
+          
           git merge --no-ff "$HF_BRANCH"
           
           if [[ $? -ne 0 ]]; then
@@ -88,9 +88,11 @@ jobs:
         fi
 
         # Step 3: Handle profit_dep_minor to master merge
-        if [[ "$GITHUB_REF" == refs/heads/profit_dep_minor_* ]] || [[ "$CONFLICT" != "true" && "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
+        if [[ "$GITHUB_REF" == refs/heads/profit_dep_minor_* ]] || [[ "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
+          git fetch origin
           git checkout master
           git pull origin master
+          
           MINOR_BRANCH=$(fetch_branch 'profit_dep_minor_')
           if [[ -z "$MINOR_BRANCH" ]]; then
             echo "No minor branch found. Exiting."
@@ -98,7 +100,11 @@ jobs:
           fi
           echo "Found minor branch: $MINOR_BRANCH"
           
-          echo "Merging $MINOR_BRANCH into master"
+          # Check if the minor branch exists locally; if not, fetch it
+          if ! git show-ref --quiet "refs/heads/$MINOR_BRANCH"; then
+            git fetch origin "$MINOR_BRANCH:$MINOR_BRANCH"
+          fi
+
           git merge --no-ff "$MINOR_BRANCH"
           
           if [[ $? -ne 0 ]]; then
