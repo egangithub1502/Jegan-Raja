@@ -5,6 +5,7 @@ on:
     branches:
       - 'profit_dep_hf_*'
       - 'profit_dep_minor_*'
+      - 'master'
 
 jobs:
   auto-merge:
@@ -23,12 +24,11 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
 
-    # Merge from profit_dep_hf_* to profit_dep_minor_*
     - name: Merge profit_dep_hf to profit_dep_minor
       if: startsWith(github.ref, 'refs/heads/profit_dep_hf_')
       run: |
         # Identify the correct minor branch
-        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||')
+        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
         git checkout "$MINOR_BRANCH"
         git pull origin "$MINOR_BRANCH"
         git merge --no-ff "${GITHUB_REF#refs/heads/}" || {
@@ -51,12 +51,12 @@ jobs:
                         --assignee "$COMMIT_USER"
         exit 1
 
-    # Merge from profit_dep_minor_* to master
     - name: Merge profit_dep_minor to master
       if: (startsWith(github.ref, 'refs/heads/profit_dep_hf_') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || startsWith(github.ref, 'refs/heads/profit_dep_minor_')
       run: |
         git checkout master
         git pull origin master
+        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
         git merge --no-ff "$MINOR_BRANCH" || {
           # Create temporary branch on conflict
           TEMP_BRANCH="temp/minor-to-master-$(date +%s)"
@@ -77,9 +77,9 @@ jobs:
                         --assignee "$COMMIT_USER"
         exit 1
 
-    # Push merged changes to both minor and master branches if no conflicts
     - name: Push merged changes
       if: (startsWith(github.ref, 'refs/heads/profit_dep_hf_') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || (steps.merge_minor_to_master.outputs.CONFLICT != 'true')
       run: |
+        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
         git push origin "$MINOR_BRANCH"
         git push origin master
