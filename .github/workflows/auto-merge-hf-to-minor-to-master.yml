@@ -17,6 +17,9 @@ jobs:
 
     - name: Set up Git
       run: |
+        # Configure Git with a default user
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
         # Fetch the latest commit information
         COMMITTER_NAME=$(git log -1 --pretty=format:'%cn')
         COMMITTER_EMAIL=$(git log -1 --pretty=format:'%ce')
