@@ -1,79 +1,71 @@
-name: Auto Merge Branches
+name: Auto Merge
 
 on:
   push:
     branches:
-      - 'profit_dep_hf_*'
+      - profit_dep_hf_*
 
 jobs:
-  find_and_merge_branches:
-    runs-on: ubuntu-latest
+  merge:
+    runs-on: ubuntu-22.04  # Specifies the runner image version
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Fetches all history for branches and tags
 
-    - name: Set up Git
-      run: |
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git config --global --add safe.directory /github/workspace
-
-    - name: Find latest HF and minor branches
-      id: find_branches
-      run: |
-        # Find the latest HF branch
-        HF_BRANCH=$(git branch -r | grep "origin/profit_dep_hf_" | sort -r | head -n 1 | sed 's|origin/||')
-        echo "HF_BRANCH=$HF_BRANCH" >> $GITHUB_ENV
-
-        # Find the latest minor branch
-        MINOR_BRANCH=$(git branch -r | grep "origin/profit_dep_minor_" | sort -r | head -n 1 | sed 's|origin/||')
-        echo "MINOR_BRANCH=$MINOR_BRANCH" >> $GITHUB_ENV
-
-    - name: Merge HF into minor
-      run: |
-        git checkout ${{ env.MINOR_BRANCH }}
-        git merge ${{ env.HF_BRANCH }} || {
-          echo "Conflict detected during merge from ${{ env.HF_BRANCH }} to ${{ env.MINOR_BRANCH }}";
-          git checkout -b temp_branch_hf_minor
-          git merge ${{ env.HF_BRANCH }}
-          echo "Creating pull request to resolve conflicts";
-          gh pr create --base ${{ env.MINOR_BRANCH }} --head temp_branch_hf_minor --title "Resolve conflicts between ${{ env.HF_BRANCH }} and ${{ env.MINOR_BRANCH }}" --body "Conflicts detected. Please resolve conflicts."
-          exit 1
-        }
-        git push origin ${{ env.MINOR_BRANCH }}
-
-  merge_minor_to_master:
-    needs: find_and_merge_branches
-    runs-on: ubuntu-latest
-    if: success() # Proceed only if the previous job succeeded
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    - name: Fetch and checkout master branch
-      run: |
-        # Fetch all branches including master
-        git fetch origin master:master
-
-        # Checkout the master branch
-        git checkout master
-
-    - name: Set up Git
-      run: |
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git config --global --add safe.directory /github/workspace
-
-    - name: Merge minor into master
-      run: |
-        git merge ${{ env.MINOR_BRANCH }} || {
-          echo "Conflict detected during merge from ${{ env.MINOR_BRANCH }} to master";
-          git checkout -b temp_branch_minor_master
-          git merge ${{ env.MINOR_BRANCH }}
-          echo "Creating pull request to resolve conflicts";
-          gh pr create --base master --head temp_branch_minor_master --title "Resolve conflicts between ${{ env.MINOR_BRANCH }} and master" --body "Conflicts detected. Please resolve conflicts."
-          exit 1
-        }
-        git push origin master
+      - name: Install GitHub CLI
+        run: |
+          sudo apt update
+          sudo apt install -y gh
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+      - name: Authenticate GitHub CLI
+        run: |
+          echo "${{ secrets.JEGANRAJA }}" | gh auth login --with-token
+      - name: Fetch All Branches
+        run: |
+          git fetch --all
+          echo "Available branches:"
+          git branch -r  # Debug: List all remote branches
+      - name: Debug Branch References
+        run: |
+          echo "Checking master branch reference"
+          git branch -a  # Debug: List all branches including local and remote
+          git show-ref --heads master || echo "Master branch not found"  # Debug: Show references for master
+      - name: Find and Merge Branches
+        id: find-branches
+        run: |
+          # Find the latest branch matching the hf prefix
+          HF_BRANCH=$(git branch -r | grep 'origin/profit_dep_hf_' | sort -V | tail -n 1 | sed 's|origin/||')
+          echo "Latest HF branch: $HF_BRANCH"
+          # Find the latest minor branch
+          MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | sort -V | tail -n 1 | sed 's|origin/||')
+          echo "Latest Minor branch: $MINOR_BRANCH"
+          echo "Master branch: master"
+          # Check if branches exist
+          if [ -z "$MINOR_BRANCH" ]; then
+            echo "Error: Minor branch does not exist"
+            exit 1
+          fi
+          # Ensure master branch is checked out
+          git fetch origin master
+          git checkout master || (echo "Error: Master branch does not exist" && exit 1)
+          # Check if master branch exists
+          if git show-ref --verify --quiet refs/heads/master; then
+            echo "Master branch exists"
+          else
+            echo "Error: Master branch does not exist"
+            exit 1
+          fi
+          # Merge hf branch into minor branch
+          git checkout $MINOR_BRANCH
+          git merge $HF_BRANCH --no-ff -m "Merge $HF_BRANCH into $MINOR_BRANCH"
+          git push origin $MINOR_BRANCH
+          # Merge minor branch into master branch
+          git checkout master
+          git merge $MINOR_BRANCH --no-ff -m "Merge $MINOR_BRANCH into master"
+          git push origin master
