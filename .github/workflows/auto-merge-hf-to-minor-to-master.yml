@@ -42,6 +42,11 @@ jobs:
             git clone --single-branch --branch "$target_branch" "$REPO_URL" "$target_branch"
             cd "$target_branch" || exit
 
+            # Initialize Git repository if needed
+            if [ ! -d ".git" ]; then
+              git init
+            fi
+
             # Fetch source branch if not present
             if ! git show-ref --quiet "refs/heads/$source_branch"; then
               git fetch origin "$source_branch:$source_branch"
@@ -81,3 +86,13 @@ jobs:
           if [[ "$GITHUB_REF" == refs/heads/profit_dep_minor_* ]]; then
             merge_branches "$GITHUB_REF" "master"
           fi
+        ```
+
+This revised script includes additional checks and steps to handle potential issues:
+
+* Initializes the Git repository if it doesn't exist.
+* Provides more explicit error handling (although it could be further improved).
+
+If you continue to face issues, please provide more details about the specific error messages or the actions you're trying to perform.
+ 
+**Would you like to add more error handling or logging to the script?** 
