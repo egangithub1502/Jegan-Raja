@@ -9,6 +9,7 @@ on:
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -41,23 +42,30 @@ jobs:
       run: |
         #!/usr/bin/env bash
         set -o pipefail
+
         # Configuration
         REPO_URL="https://github.com/egangithub1502/Jegan-Raja"
         GH_TOKEN="${JEGANTOKEN}"
         GOOGLE_CHAT_WEBHOOK_URL="${GOOGLE_CHAT_WEBHOOK_URL}"
+
         # Functions
         function fetch_branch() {
           local pattern=$1
           git branch -r | grep "origin/$pattern" | tail -n 1 | sed 's|origin/||' | xargs
         }
+
         function get_conflicting_files() {
           git status --porcelain | grep "^UU " | sed 's/^UU //' | xargs
         }
+
         # Main Script
-        # Step 1: Check out the repo and set up Git
+        echo "Cloning repository..."
         git clone "$REPO_URL" repo
-        cd repo || exit
-        # Step 2: Handle profit_dep_hf to profit_dep_minor merge
+        cd repo || { echo "Failed to change directory"; exit 1; }
+
+        echo "Fetching branches..."
+        git fetch origin
+
         if [[ "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
           MINOR_BRANCH=$(fetch_branch 'profit_dep_minor_')
           if [[ -z "$MINOR_BRANCH" ]]; then
@@ -66,14 +74,12 @@ jobs:
           fi
           echo "Found minor branch: $MINOR_BRANCH"
           
-          git fetch origin
           git checkout "$MINOR_BRANCH"
           git pull origin "$MINOR_BRANCH"
           
           HF_BRANCH="${GITHUB_REF#refs/heads/}"
           echo "Merging $HF_BRANCH into $MINOR_BRANCH"
           
-          # Check if the HF branch exists locally; if not, fetch it
           if ! git show-ref --quiet "refs/heads/$HF_BRANCH"; then
             git fetch origin "$HF_BRANCH:$HF_BRANCH"
           fi
@@ -88,15 +94,13 @@ jobs:
             git push origin "$TEMP_BRANCH"
             CONFLICT_FILES=$(get_conflicting_files)
             echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
-            # Notify Google Chat
             curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $HF_BRANCH to $MINOR_BRANCH. Temporary branch created: $TEMP_BRANCH. Conflicting files: $CONFLICT_FILES\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
           else
             git push origin "$MINOR_BRANCH"
           fi
         fi
-        # Step 3: Handle profit_dep_minor to master merge
+
         if [[ "$GITHUB_REF" == refs/heads/profit_dep_minor_* ]] || [[ "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
-          git fetch origin
           git checkout master
           git pull origin master
           
@@ -107,10 +111,10 @@ jobs:
           fi
           echo "Found minor branch: $MINOR_BRANCH"
           
-          # Check if the minor branch exists locally; if not, fetch it
           if ! git show-ref --quiet "refs/heads/$MINOR_BRANCH"; then
             git fetch origin "$MINOR_BRANCH:$MINOR_BRANCH"
           fi
+          
           git merge --no-ff "$MINOR_BRANCH"
           MERGE_STATUS=$?
           echo "Merge status: $MERGE_STATUS"
@@ -121,7 +125,6 @@ jobs:
             git push origin "$TEMP_BRANCH"
             CONFLICT_FILES=$(get_conflicting_files)
             echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
-            # Notify Google Chat
             curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $MINOR_BRANCH to master. Temporary branch created: $TEMP_BRANCH. Conflicting files: $CONFLICT_FILES\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
           else
             git push origin master
