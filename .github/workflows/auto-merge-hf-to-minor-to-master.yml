@@ -17,8 +17,7 @@ jobs:
 
     - name: Set up Git for authentication
       run: |
-        git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
-
+        git config --global url."https://x-access-token:${{ secrets.JEGANTOKEN }}@github.com/".insteadOf "https://github.com/"
     - name: Set up Git
       run: |
         # Configure Git with a default user
@@ -27,37 +26,30 @@ jobs:
         # Fetch the latest commit information
         COMMITTER_NAME=$(git log -1 --pretty=format:'%cn')
         COMMITTER_EMAIL=$(git log -1 --pretty=format:'%ce')
-
         # Display the committer information
         echo "Committer Name: $COMMITTER_NAME"
         echo "Committer Email: $COMMITTER_EMAIL"
-
         # Configure Git with the committer's information
         git config user.name "$COMMITTER_NAME"
         git config user.email "$COMMITTER_EMAIL"
-
     - name: Run auto merge script
       env:
         JEGANTOKEN: ${{ secrets.JEGANTOKEN }}
       run: |
         #!/usr/bin/env bash
         set -o pipefail
-
         # Configuration
         REPO_URL="https://github.com/egangithub1502/Jegan-Raja"
         GH_TOKEN="${JEGANTOKEN}"
-
         # Functions
         function fetch_branch() {
           local pattern=$1
           git branch -r | grep "origin/$pattern" | tail -n 1 | sed 's|origin/||' | xargs
         }
-
         # Main Script
         # Step 1: Check out the repo and set up Git
         git clone "$REPO_URL" repo
         cd repo || exit
-
         # Step 2: Handle profit_dep_hf to profit_dep_minor merge
         if [[ "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
           MINOR_BRANCH=$(fetch_branch 'profit_dep_minor_')
@@ -91,7 +83,6 @@ jobs:
             git push origin "$MINOR_BRANCH"
           fi
         fi
-
         # Step 3: Handle profit_dep_minor to master merge
         if [[ "$GITHUB_REF" == refs/heads/profit_dep_minor_* ]] || [[ "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
           git fetch origin
@@ -109,7 +100,6 @@ jobs:
           if ! git show-ref --quiet "refs/heads/$MINOR_BRANCH"; then
             git fetch origin "$MINOR_BRANCH:$MINOR_BRANCH"
           fi
-
           git merge --no-ff "$MINOR_BRANCH"
           
           if [[ $? -ne 0 ]]; then
