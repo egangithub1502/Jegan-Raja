@@ -23,14 +23,19 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
 
-    # Merge from profit_dep_hf_* to profit_dep_minor_*
     - name: Merge profit_dep_hf to profit_dep_minor
       if: startsWith(github.ref, 'refs/heads/profit_dep_hf_')
       run: |
         # Identify the correct minor branch
-        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||')
+        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
+        if [ -z "$MINOR_BRANCH" ]; then
+          echo "No minor branch found. Exiting."
+          exit 1
+        fi
+        echo "Found minor branch: $MINOR_BRANCH"
         git checkout "$MINOR_BRANCH"
         git pull origin "$MINOR_BRANCH"
+        git fetch origin
         git merge --no-ff "${GITHUB_REF#refs/heads/}" || {
           # Create temporary branch on conflict
           TEMP_BRANCH="temp/hf-to-minor-$(date +%s)"
@@ -40,23 +45,24 @@ jobs:
         }
       id: merge_hf_to_minor
 
-    - name: Notify user of conflict in profit_dep_hf to profit_dep_minor
+    - name: Create Pull Request for profit_dep_hf to profit_dep_minor
       if: steps.merge_hf_to_minor.outputs.CONFLICT == 'true'
       run: |
-        # Get the user who caused the conflict
-        COMMIT_USER=$(git log -1 --pretty=format:'%ae' -n 1)
-        echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
-        gh issue create --title "Conflict in profit_dep_hf to profit_dep_minor merge" \
-                        --body "A conflict was detected when merging profit_dep_hf into profit_dep_minor. Please resolve the conflict on the temporary branch: $TEMP_BRANCH." \
-                        --assignee "$COMMIT_USER"
-        exit 1
+        gh pr create --base "$MINOR_BRANCH" --head "${GITHUB_REF#refs/heads/}" --title "Merge ${GITHUB_REF#refs/heads/} into $MINOR_BRANCH" --body "Automatic merge from ${GITHUB_REF#refs/heads/} into $MINOR_BRANCH"
+      id: create_pr_hf_to_minor
 
-    # Merge from profit_dep_minor_* to master
     - name: Merge profit_dep_minor to master
       if: (startsWith(github.ref, 'refs/heads/profit_dep_hf_') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || startsWith(github.ref, 'refs/heads/profit_dep_minor_')
       run: |
         git checkout master
         git pull origin master
+        git fetch origin
+        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
+        if [ -z "$MINOR_BRANCH" ]; then
+          echo "No minor branch found. Exiting."
+          exit 1
+        fi
+        echo "Found minor branch: $MINOR_BRANCH"
         git merge --no-ff "$MINOR_BRANCH" || {
           # Create temporary branch on conflict
           TEMP_BRANCH="temp/minor-to-master-$(date +%s)"
@@ -66,20 +72,37 @@ jobs:
         }
       id: merge_minor_to_master
 
-    - name: Notify user of conflict in profit_dep_minor to master
+    - name: Create Pull Request for profit_dep_minor to master
       if: steps.merge_minor_to_master.outputs.CONFLICT == 'true'
+      run: |
+        gh pr create --base master --head "$MINOR_BRANCH" --title "Merge $MINOR_BRANCH into master" --body "Automatic merge from $MINOR_BRANCH into master"
+      id: create_pr_minor_to_master
+
+    - name: Push merged changes to profit_dep_minor
+      if: steps.merge_hf_to_minor.outputs.CONFLICT != 'true'
+      run: |
+        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
+        if [ -z "$MINOR_BRANCH" ]; then
+          echo "No minor branch found. Exiting."
+          exit 1
+        fi
+        echo "Found minor branch: $MINOR_BRANCH"
+        git push origin "$MINOR_BRANCH"
+      id: push_minor
+
+    - name: Push merged changes to master
+      if: steps.merge_minor_to_master.outputs.CONFLICT != 'true'
+      run: |
+        git push origin master
+      id: push_master
+
+    - name: Notify user of conflict
+      if: steps.merge_hf_to_minor.outputs.CONFLICT == 'true' || steps.merge_minor_to_master.outputs.CONFLICT == 'true'
       run: |
         # Get the user who caused the conflict
         COMMIT_USER=$(git log -1 --pretty=format:'%ae' -n 1)
         echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
-        gh issue create --title "Conflict in profit_dep_minor to master merge" \
-                        --body "A conflict was detected when merging profit_dep_minor into master. Please resolve the conflict on the temporary branch: $TEMP_BRANCH." \
+        gh issue create --title "Conflict detected in branch merge" \
+                        --body "A conflict was detected in the merge process. Please resolve the conflict on the temporary branch: $TEMP_BRANCH." \
                         --assignee "$COMMIT_USER"
         exit 1
-
-    # Push merged changes to both minor and master branches if no conflicts
-    - name: Push merged changes
-      if: (startsWith(github.ref, 'refs/heads/profit_dep_hf_') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || (steps.merge_minor_to_master.outputs.CONFLICT != 'true')
-      run: |
-        git push origin "$MINOR_BRANCH"
-        git push origin master
