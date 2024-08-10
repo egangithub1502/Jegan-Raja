@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JEGANTOKEN: ${{ secrets.JEGANTOKEN }}
-      GH_TOKEN: ${{ secrets.JEGANTOKEN }}  # Add GitHub CLI token for authentication
+      GH_TOKEN: ${{ secrets.JEGANTOKEN }}
 
     steps:
     - name: Checkout code
@@ -60,6 +60,12 @@ jobs:
     - name: Push merged changes to profit_dep_minor
       if: steps.merge_hf_to_minor.outputs.CONFLICT != 'true'
       run: |
+        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
+        if [ -z "$MINOR_BRANCH" ]; then
+          echo "No minor branch found. Exiting."
+          exit 1
+        fi
+        echo "Pushing changes to minor branch: $MINOR_BRANCH"
         git checkout "$MINOR_BRANCH"
         git push origin "$MINOR_BRANCH"
       id: push_minor
