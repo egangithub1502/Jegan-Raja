@@ -21,16 +21,12 @@ jobs:
         
     - name: Set up Git
       run: |
-        # Configure Git with a default user
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        # Fetch the latest commit information
         COMMITTER_NAME=$(git log -1 --pretty=format:'%cn')
         COMMITTER_EMAIL=$(git log -1 --pretty=format:'%ce')
-        # Display the committer information
         echo "Committer Name: $COMMITTER_NAME"
         echo "Committer Email: $COMMITTER_EMAIL"
-        # Configure Git with the committer's information
         git config user.name "$COMMITTER_NAME"
         git config user.email "$COMMITTER_EMAIL"
         
@@ -40,20 +36,19 @@ jobs:
       run: |
         #!/usr/bin/env bash
         set -o pipefail
-        # Configuration
         REPO_URL="https://github.com/egangithub1502/Jegan-Raja"
         GH_TOKEN="${JEGANTOKEN}"
         GOOGLE_CHAT_WEBHOOK_URL="${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}"
-        # Functions
+        
         function fetch_branch() {
           local pattern=$1
           git branch -r | grep "origin/$pattern" | tail -n 1 | sed 's|origin/||' | xargs
         }
-        # Main Script
-        # Step 1: Check out the repo and set up Git
+        
         git clone "$REPO_URL" repo
         cd repo || exit
-        # Step 2: Handle profit_dep_hf to profit_dep_minor merge
+        
+        # Handle profit_dep_hf to profit_dep_minor and master merge
         if [[ "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
           MINOR_BRANCH=$(fetch_branch 'profit_dep_minor_')
           if [[ -z "$MINOR_BRANCH" ]]; then
@@ -69,7 +64,6 @@ jobs:
           HF_BRANCH="${GITHUB_REF#refs/heads/}"
           echo "Merging $HF_BRANCH into $MINOR_BRANCH"
           
-          # Check if the HF branch exists locally; if not, fetch it
           if ! git show-ref --quiet "refs/heads/$HF_BRANCH"; then
             git fetch origin "$HF_BRANCH:$HF_BRANCH"
           fi
@@ -81,15 +75,39 @@ jobs:
             git checkout -b "$TEMP_BRANCH"
             git push origin "$TEMP_BRANCH"
             echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
-            # Notify Google Chat
             curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $HF_BRANCH to $MINOR_BRANCH. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
             exit 1
           else
             git push origin "$MINOR_BRANCH"
           fi
+
+          # Merge minor branch changes into master
+          git fetch origin
+          git checkout master
+          git pull origin master
+          
+          echo "Merging $MINOR_BRANCH into master"
+          
+          if ! git show-ref --quiet "refs/heads/$MINOR_BRANCH"; then
+            git fetch origin "$MINOR_BRANCH:$MINOR_BRANCH"
+          fi
+          
+          git merge --no-ff "$MINOR_BRANCH"
+          
+          if [[ $? -ne 0 ]]; then
+            TEMP_BRANCH="temp/minor-to-master-$(date +%s)"
+            git checkout -b "$TEMP_BRANCH"
+            git push origin "$TEMP_BRANCH"
+            echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
+            curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $MINOR_BRANCH to master. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
+            exit 1
+          else
+            git push origin master
+          fi
         fi
-        # Step 3: Handle profit_dep_minor to master merge
-        if [[ "$GITHUB_REF" == refs/heads/profit_dep_minor_* ]] || [[ "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
+
+        # Handle profit_dep_minor to master merge
+        if [[ "$GITHUB_REF" == refs/heads/profit_dep_minor_* ]]; then
           git fetch origin
           git checkout master
           git pull origin master
@@ -101,10 +119,10 @@ jobs:
           fi
           echo "Found minor branch: $MINOR_BRANCH"
           
-          # Check if the minor branch exists locally; if not, fetch it
           if ! git show-ref --quiet "refs/heads/$MINOR_BRANCH"; then
             git fetch origin "$MINOR_BRANCH:$MINOR_BRANCH"
           fi
+          
           git merge --no-ff "$MINOR_BRANCH"
           
           if [[ $? -ne 0 ]]; then
@@ -112,7 +130,6 @@ jobs:
             git checkout -b "$TEMP_BRANCH"
             git push origin "$TEMP_BRANCH"
             echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
-            # Notify Google Chat
             curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $MINOR_BRANCH to master. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
             exit 1
           else
