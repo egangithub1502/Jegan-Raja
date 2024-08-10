@@ -22,14 +22,14 @@ jobs:
         
     - name: Run auto merge script
       env:
-        GH_TOKEN: ${{ secrets.JEGANTOKEN }}
+        JEGANTOKEN: ${{ secrets.JEGANTOKEN }}
       run: |
         #!/usr/bin/env bash
         set -o pipefail
 
         # Configuration
         REPO_URL="https://github.com/egangithub1502/Jegan-Raja"
-        GH_TOKEN="${GH_TOKEN}"
+        GH_TOKEN="${JEGANTOKEN}"
 
         # Functions
         function fetch_branch() {
