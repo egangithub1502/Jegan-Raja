@@ -15,6 +15,10 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Set up Git for authentication
+      run: |
+        git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
     - name: Set up Git
       run: |
         # Configure Git with a default user
@@ -51,8 +55,6 @@ jobs:
 
         # Main Script
         # Step 1: Check out the repo and set up Git
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
         git clone "$REPO_URL" repo
         cd repo || exit
 
