@@ -10,7 +10,6 @@ jobs:
   auto-merge:
     runs-on: ubuntu-latest
     env:
-      JEGANTOKEN: ${{ secrets.JEGANTOKEN }}
       GH_TOKEN: ${{ secrets.JEGANTOKEN }}
 
     steps:
@@ -29,7 +28,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.JEGANTOKEN }}
 
-    - name: Merge profit_dep_hf to profit_dep_minor
+    - name: Identify and Merge profit_dep_hf to profit_dep_minor
       if: startsWith(github.ref, 'refs/heads/profit_dep_hf_')
       run: |
         # Identify the correct minor branch
@@ -41,7 +40,6 @@ jobs:
         echo "Found minor branch: $MINOR_BRANCH"
         git checkout "$MINOR_BRANCH"
         git pull origin "$MINOR_BRANCH"
-        git fetch origin
         git merge --no-ff "${GITHUB_REF#refs/heads/}" || {
           # Create temporary branch on conflict
           TEMP_BRANCH="temp/hf-to-minor-$(date +%s)"
@@ -49,6 +47,9 @@ jobs:
           git push origin "$TEMP_BRANCH"
           echo "CONFLICT=true" >> $GITHUB_ENV
         }
+        if [ ! -f .git/MERGE_MSG ]; then
+          git push origin "$MINOR_BRANCH"
+        fi
       id: merge_hf_to_minor
 
     - name: Create Pull Request for profit_dep_hf to profit_dep_minor
@@ -57,25 +58,11 @@ jobs:
         gh pr create --base "$MINOR_BRANCH" --head "${GITHUB_REF#refs/heads/}" --title "Merge ${GITHUB_REF#refs/heads/} into $MINOR_BRANCH" --body "Automatic merge from ${GITHUB_REF#refs/heads/} into $MINOR_BRANCH"
       id: create_pr_hf_to_minor
 
-    - name: Push merged changes to profit_dep_minor
-      if: env.CONFLICT != 'true'
-      run: |
-        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
-        if [ -z "$MINOR_BRANCH" ]; then
-          echo "No minor branch found. Exiting."
-          exit 1
-        fi
-        echo "Pushing changes to minor branch: $MINOR_BRANCH"
-        git checkout "$MINOR_BRANCH"
-        git push origin "$MINOR_BRANCH"
-      id: push_minor
-
-    - name: Merge profit_dep_minor to master
+    - name: Identify and Merge profit_dep_minor to master
       if: (startsWith(github.ref, 'refs/heads/profit_dep_hf_') && env.CONFLICT != 'true') || startsWith(github.ref, 'refs/heads/profit_dep_minor_')
       run: |
         git checkout master
         git pull origin master
-        git fetch origin
         MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
         if [ -z "$MINOR_BRANCH" ]; then
           echo "No minor branch found. Exiting."
@@ -89,6 +76,9 @@ jobs:
           git push origin "$TEMP_BRANCH"
           echo "CONFLICT=true" >> $GITHUB_ENV
         }
+        if [ ! -f .git/MERGE_MSG ]; then
+          git push origin master
+        fi
       id: merge_minor_to_master
 
     - name: Create Pull Request for profit_dep_minor to master
@@ -96,13 +86,6 @@ jobs:
       run: |
         gh pr create --base master --head "$MINOR_BRANCH" --title "Merge $MINOR_BRANCH into master" --body "Automatic merge from $MINOR_BRANCH into master"
       id: create_pr_minor_to_master
-
-    - name: Push merged changes to master
-      if: env.CONFLICT != 'true'
-      run: |
-        git checkout master
-        git push origin master
-      id: push_master
 
     - name: Notify user of conflict
       if: env.CONFLICT == 'true'
