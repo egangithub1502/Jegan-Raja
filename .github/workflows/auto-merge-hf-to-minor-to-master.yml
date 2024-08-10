@@ -64,11 +64,25 @@ jobs:
               git push origin "$target_branch"
             else
               git reset --hard HEAD
-              TEMP_BRANCH="temp/$source_branch-to-$target_branch-$(date +%s)"
-              git checkout -b "$TEMP_BRANCH"
-              git push origin "$TEMP_BRANCH"
-              echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
-              curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $source_branch to $target_branch. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
+
+              # Attempt to automatically resolve common conflicts
+              git checkout "$source_branch"
+              git merge-file --ours .github/workflows/auto-merge-hf-to-minor-to-master.yml
+              git checkout "$target_branch"
+
+              # Check for conflicts again
+              git merge --no-ff --no-commit "$source_branch"
+              if [[ $? -eq 0 ]]; then
+                git commit -m "Merged $source_branch into $target_branch with conflict resolution"
+                git push origin "$target_branch"
+              else
+                # Handle complex conflicts
+                TEMP_BRANCH="temp/$source_branch-to-$target_branch-$(date +%s)"
+                git checkout -b "$TEMP_BRANCH"
+                git push origin "$TEMP_BRANCH"
+                echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
+                curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $source_branch to $target_branch. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
+              fi
             fi
           }
 
