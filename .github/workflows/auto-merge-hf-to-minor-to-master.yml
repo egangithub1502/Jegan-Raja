@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JEGANTOKEN: ${{ secrets.JEGANTOKEN }}
-      GH_TOKEN: ${{ secrets.JEGANTOKEN }}  # Add GitHub CLI token for authentication
+      GH_TOKEN: ${{ secrets.JEGANTOKEN }}
 
     steps:
     - name: Checkout code
@@ -57,6 +57,19 @@ jobs:
         gh pr create --base "$MINOR_BRANCH" --head "${GITHUB_REF#refs/heads/}" --title "Merge ${GITHUB_REF#refs/heads/} into $MINOR_BRANCH" --body "Automatic merge from ${GITHUB_REF#refs/heads/} into $MINOR_BRANCH"
       id: create_pr_hf_to_minor
 
+    - name: Push merged changes to profit_dep_minor
+      if: steps.merge_hf_to_minor.outputs.CONFLICT != 'true'
+      run: |
+        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
+        if [ -z "$MINOR_BRANCH" ]; then
+          echo "No minor branch found. Exiting."
+          exit 1
+        fi
+        echo "Pushing changes to minor branch: $MINOR_BRANCH"
+        git checkout "$MINOR_BRANCH"
+        git push origin "$MINOR_BRANCH"
+      id: push_minor
+
     - name: Merge profit_dep_minor to master
       if: (startsWith(github.ref, 'refs/heads/profit_dep_hf_') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || startsWith(github.ref, 'refs/heads/profit_dep_minor_')
       run: |
@@ -84,21 +97,10 @@ jobs:
         gh pr create --base master --head "$MINOR_BRANCH" --title "Merge $MINOR_BRANCH into master" --body "Automatic merge from $MINOR_BRANCH into master"
       id: create_pr_minor_to_master
 
-    - name: Push merged changes to profit_dep_minor
-      if: steps.merge_hf_to_minor.outputs.CONFLICT != 'true'
-      run: |
-        MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
-        if [ -z "$MINOR_BRANCH" ]; then
-          echo "No minor branch found. Exiting."
-          exit 1
-        fi
-        echo "Found minor branch: $MINOR_BRANCH"
-        git push origin "$MINOR_BRANCH"
-      id: push_minor
-
     - name: Push merged changes to master
       if: steps.merge_minor_to_master.outputs.CONFLICT != 'true'
       run: |
+        git checkout master
         git push origin master
       id: push_master
 
