@@ -45,9 +45,6 @@ jobs:
             git branch -r | grep "origin/$pattern" | tail -n 1 | sed 's|origin/||' | xargs
           }
 
-          git clone "$REPO_URL" repo
-          cd repo || exit
-
           function merge_branches() {
             local source_branch="$1"
             local target_branch="$2"
@@ -60,17 +57,18 @@ jobs:
               git fetch origin "$source_branch:$source_branch"
             fi
 
-            git merge --no-ff "$source_branch"
-
-            if [[ $? -ne 0 ]]; then
+            # Check for conflicts before merging
+            git merge --no-ff --no-commit "$source_branch"
+            if [[ $? -eq 0 ]]; then
+              git commit -m "Merged $source_branch into $target_branch"
+              git push origin "$target_branch"
+            else
+              git reset --hard HEAD
               TEMP_BRANCH="temp/$source_branch-to-$target_branch-$(date +%s)"
               git checkout -b "$TEMP_BRANCH"
               git push origin "$TEMP_BRANCH"
               echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
               curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $source_branch to $target_branch. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
-              exit 1
-            else
-              git push origin "$target_branch"
             fi
           }
 
