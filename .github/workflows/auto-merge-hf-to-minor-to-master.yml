@@ -62,7 +62,10 @@ jobs:
           git checkout "$MINOR_BRANCH"
           git pull origin "$MINOR_BRANCH"
           git fetch origin
-          git merge --no-ff "${GITHUB_REF#refs/heads/}"
+          
+          HF_BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "Merging $HF_BRANCH into $MINOR_BRANCH"
+          git merge --no-ff "$HF_BRANCH"
           
           if [[ $? -ne 0 ]]; then
             TEMP_BRANCH="temp/hf-to-minor-$(date +%s)"
