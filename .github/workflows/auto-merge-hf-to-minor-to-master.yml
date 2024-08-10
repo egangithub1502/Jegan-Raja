@@ -1,0 +1,80 @@
+name: Auto Merge profit_dep_hf to profit_dep_minor to master
+
+on:
+  push:
+    branches:
+      - 'profit_dep_hf*'
+      - 'profit_dep_minor*'
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    env:
+      JEGANTOKEN: ${{ secrets.JEGANTOKEN }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Set up Git
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+
+    - name: Merge profit_dep_hf to profit_dep_minor
+      if: startsWith(github.ref, 'refs/heads/profit_dep_hf')
+      run: |
+        git checkout profit_dep_minor
+        git pull origin profit_dep_minor
+        git merge --no-ff ${GITHUB_REF#refs/heads/} || {
+          # Create temporary branch on conflict
+          TEMP_BRANCH="temp/hf-to-minor-$(date +%s)"
+          git checkout -b "$TEMP_BRANCH"
+          git push origin "$TEMP_BRANCH"
+          echo "::set-output name=CONFLICT::true"
+        }
+      id: merge_hf_to_minor
+
+    - name: Notify user of conflict in profit_dep_hf to profit_dep_minor
+      if: steps.merge_hf_to_minor.outputs.CONFLICT == 'true'
+      run: |
+        # Get the user who caused the conflict
+        COMMIT_USER=$(git log -1 --pretty=format:'%ae' -n 1)
+        echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
+        gh issue create --title "Conflict in profit_dep_hf to profit_dep_minor merge" \
+                        --body "A conflict was detected when merging profit_dep_hf into profit_dep_minor. Please resolve the conflict on the temporary branch: $TEMP_BRANCH." \
+                        --assignee $COMMIT_USER
+        exit 1
+
+    - name: Merge profit_dep_minor to master
+      if: (startsWith(github.ref, 'refs/heads/profit_dep_hf') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || startsWith(github.ref, 'refs/heads/profit_dep_minor')
+      run: |
+        git checkout master
+        git pull origin master
+        git merge --no-ff profit_dep_minor || {
+          # Create temporary branch on conflict
+          TEMP_BRANCH="temp/minor-to-master-$(date +%s)"
+          git checkout -b "$TEMP_BRANCH"
+          git push origin "$TEMP_BRANCH"
+          echo "::set-output name=CONFLICT::true"
+        }
+      id: merge_minor_to_master
+
+    - name: Notify user of conflict in profit_dep_minor to master
+      if: steps.merge_minor_to_master.outputs.CONFLICT == 'true'
+      run: |
+        # Get the user who caused the conflict
+        COMMIT_USER=$(git log -1 --pretty=format:'%ae' -n 1)
+        echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
+        gh issue create --title "Conflict in profit_dep_minor to master merge" \
+                        --body "A conflict was detected when merging profit_dep_minor into master. Please resolve the conflict on the temporary branch: $TEMP_BRANCH." \
+                        --assignee $COMMIT_USER
+        exit 1
+
+    - name: Push merged changes
+      if: (startsWith(github.ref, 'refs/heads/profit_dep_hf') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || (steps.merge_minor_to_master.outputs.CONFLICT != 'true')
+      run: |
+        git push origin profit_dep_minor
+        git push origin master
