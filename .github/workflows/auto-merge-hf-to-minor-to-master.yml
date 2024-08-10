@@ -21,6 +21,10 @@ jobs:
         COMMITTER_NAME=$(git log -1 --pretty=format:'%cn')
         COMMITTER_EMAIL=$(git log -1 --pretty=format:'%ce')
 
+        # Display the committer information
+        echo "Committer Name: $COMMITTER_NAME"
+        echo "Committer Email: $COMMITTER_EMAIL"
+
         # Configure Git with the committer's information
         git config user.name "$COMMITTER_NAME"
         git config user.email "$COMMITTER_EMAIL"
