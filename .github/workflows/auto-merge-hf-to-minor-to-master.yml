@@ -47,18 +47,18 @@ jobs:
           TEMP_BRANCH="temp/hf-to-minor-$(date +%s)"
           git checkout -b "$TEMP_BRANCH"
           git push origin "$TEMP_BRANCH"
-          echo "::set-output name=CONFLICT::true"
+          echo "CONFLICT=true" >> $GITHUB_ENV
         }
       id: merge_hf_to_minor
 
     - name: Create Pull Request for profit_dep_hf to profit_dep_minor
-      if: steps.merge_hf_to_minor.outputs.CONFLICT == 'true'
+      if: env.CONFLICT == 'true'
       run: |
         gh pr create --base "$MINOR_BRANCH" --head "${GITHUB_REF#refs/heads/}" --title "Merge ${GITHUB_REF#refs/heads/} into $MINOR_BRANCH" --body "Automatic merge from ${GITHUB_REF#refs/heads/} into $MINOR_BRANCH"
       id: create_pr_hf_to_minor
 
     - name: Push merged changes to profit_dep_minor
-      if: steps.merge_hf_to_minor.outputs.CONFLICT != 'true'
+      if: env.CONFLICT != 'true'
       run: |
         MINOR_BRANCH=$(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||' | xargs)
         if [ -z "$MINOR_BRANCH" ]; then
@@ -71,7 +71,7 @@ jobs:
       id: push_minor
 
     - name: Merge profit_dep_minor to master
-      if: (startsWith(github.ref, 'refs/heads/profit_dep_hf_') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || startsWith(github.ref, 'refs/heads/profit_dep_minor_')
+      if: (startsWith(github.ref, 'refs/heads/profit_dep_hf_') && env.CONFLICT != 'true') || startsWith(github.ref, 'refs/heads/profit_dep_minor_')
       run: |
         git checkout master
         git pull origin master
@@ -87,25 +87,25 @@ jobs:
           TEMP_BRANCH="temp/minor-to-master-$(date +%s)"
           git checkout -b "$TEMP_BRANCH"
           git push origin "$TEMP_BRANCH"
-          echo "::set-output name=CONFLICT::true"
+          echo "CONFLICT=true" >> $GITHUB_ENV
         }
       id: merge_minor_to_master
 
     - name: Create Pull Request for profit_dep_minor to master
-      if: steps.merge_minor_to_master.outputs.CONFLICT == 'true'
+      if: env.CONFLICT == 'true'
       run: |
         gh pr create --base master --head "$MINOR_BRANCH" --title "Merge $MINOR_BRANCH into master" --body "Automatic merge from $MINOR_BRANCH into master"
       id: create_pr_minor_to_master
 
     - name: Push merged changes to master
-      if: steps.merge_minor_to_master.outputs.CONFLICT != 'true'
+      if: env.CONFLICT != 'true'
       run: |
         git checkout master
         git push origin master
       id: push_master
 
     - name: Notify user of conflict
-      if: steps.merge_hf_to_minor.outputs.CONFLICT == 'true' || steps.merge_minor_to_master.outputs.CONFLICT == 'true'
+      if: env.CONFLICT == 'true'
       run: |
         # Get the user who caused the conflict
         COMMIT_USER=$(git log -1 --pretty=format:'%ae' -n 1)
