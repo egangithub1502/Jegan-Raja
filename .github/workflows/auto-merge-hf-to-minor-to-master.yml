@@ -50,6 +50,9 @@ jobs:
           local pattern=$1
           git branch -r | grep "origin/$pattern" | tail -n 1 | sed 's|origin/||' | xargs
         }
+        function get_conflicting_files() {
+          git status --porcelain | grep "^UU " | sed 's/^UU //' | xargs
+        }
         # Main Script
         # Step 1: Check out the repo and set up Git
         git clone "$REPO_URL" repo
@@ -81,9 +84,10 @@ jobs:
             TEMP_BRANCH="temp/hf-to-minor-$(date +%s)"
             git checkout -b "$TEMP_BRANCH"
             git push origin "$TEMP_BRANCH"
+            CONFLICT_FILES=$(get_conflicting_files)
             echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
             # Notify Google Chat
-            curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $HF_BRANCH to $MINOR_BRANCH. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
+            curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $HF_BRANCH to $MINOR_BRANCH. Temporary branch created: $TEMP_BRANCH. Conflicting files: $CONFLICT_FILES\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
             exit 1
           else
             git push origin "$MINOR_BRANCH"
@@ -112,9 +116,10 @@ jobs:
             TEMP_BRANCH="temp/minor-to-master-$(date +%s)"
             git checkout -b "$TEMP_BRANCH"
             git push origin "$TEMP_BRANCH"
+            CONFLICT_FILES=$(get_conflicting_files)
             echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
             # Notify Google Chat
-            curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $MINOR_BRANCH to master. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
+            curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $MINOR_BRANCH to master. Temporary branch created: $TEMP_BRANCH. Conflicting files: $CONFLICT_FILES\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
             exit 1
           else
             git push origin master
