@@ -37,12 +37,6 @@ jobs:
           git branch -r | grep "origin/$pattern" | tail -n 1 | sed 's|origin/||' | xargs
         }
 
-        function create_pull_request() {
-          local base_branch=$1
-          local head_branch=$2
-          gh pr create --base "$base_branch" --head "$head_branch" --title "Merge $head_branch into $base_branch" --body "Automatic merge from $head_branch into $base_branch"
-        }
-
         # Main Script
         # Step 1: Check out the repo and set up Git
         git config user.name "GitHub Actions"
@@ -60,7 +54,6 @@ jobs:
           echo "Found minor branch: $MINOR_BRANCH"
           
           git checkout "$MINOR_BRANCH"
-          git pull origin "$MINOR_BRANCH"
           git fetch origin
           
           HF_BRANCH="${GITHUB_REF#refs/heads/}"
@@ -79,9 +72,10 @@ jobs:
         fi
 
         # Step 3: Handle profit_dep_minor to master merge
-        if [[ "$GITHUB_REF" == refs/heads/profit_dep_minor_* ]] || [[ "$CONFLICT" != "true" && "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
+        if [[ "$GITHUB_REF" == refs/heads/profit_dep_minor_* ]] || [[ "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
           git checkout master
-          git pull origin master
+          git fetch origin
+          
           MINOR_BRANCH=$(fetch_branch 'profit_dep_minor_')
           if [[ -z "$MINOR_BRANCH" ]]; then
             echo "No minor branch found. Exiting."
