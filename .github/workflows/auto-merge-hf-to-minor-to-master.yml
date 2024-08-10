@@ -3,8 +3,9 @@ name: Auto Merge profit_dep_hf to profit_dep_minor to master
 on:
   push:
     branches:
-      - 'profit_dep_hf*'
-      - 'profit_dep_minor*'
+      - 'profit_dep_hf_*'
+      - 'profit_dep_minor_*'
+      - 'master'
 
 jobs:
   auto-merge:
@@ -24,10 +25,10 @@ jobs:
         git config user.email "actions@github.com"
 
     - name: Merge profit_dep_hf to profit_dep_minor
-      if: startsWith(github.ref, 'refs/heads/profit_dep_hf')
+      if: startsWith(github.ref, 'refs/heads/profit_dep_hf_')
       run: |
-        git checkout profit_dep_minor
-        git pull origin profit_dep_minor
+        git checkout $(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||')
+        git pull origin $(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||')
         git merge --no-ff ${GITHUB_REF#refs/heads/} || {
           # Create temporary branch on conflict
           TEMP_BRANCH="temp/hf-to-minor-$(date +%s)"
@@ -49,11 +50,11 @@ jobs:
         exit 1
 
     - name: Merge profit_dep_minor to master
-      if: (startsWith(github.ref, 'refs/heads/profit_dep_hf') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || startsWith(github.ref, 'refs/heads/profit_dep_minor')
+      if: (startsWith(github.ref, 'refs/heads/profit_dep_hf_') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || startsWith(github.ref, 'refs/heads/profit_dep_minor_')
       run: |
         git checkout master
         git pull origin master
-        git merge --no-ff profit_dep_minor || {
+        git merge --no-ff $(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||') || {
           # Create temporary branch on conflict
           TEMP_BRANCH="temp/minor-to-master-$(date +%s)"
           git checkout -b "$TEMP_BRANCH"
@@ -74,7 +75,7 @@ jobs:
         exit 1
 
     - name: Push merged changes
-      if: (startsWith(github.ref, 'refs/heads/profit_dep_hf') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || (steps.merge_minor_to_master.outputs.CONFLICT != 'true')
+      if: (startsWith(github.ref, 'refs/heads/profit_dep_hf_') && steps.merge_hf_to_minor.outputs.CONFLICT != 'true') || (steps.merge_minor_to_master.outputs.CONFLICT != 'true')
       run: |
-        git push origin profit_dep_minor
+        git push origin $(git branch -r | grep 'origin/profit_dep_minor_' | tail -n 1 | sed 's|origin/||')
         git push origin master
