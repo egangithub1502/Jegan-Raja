@@ -79,10 +79,8 @@ jobs:
           fi
           
           git merge --no-ff "$HF_BRANCH"
-          MERGE_STATUS=$?
-          echo "Merge status: $MERGE_STATUS"
           
-          if [[ $MERGE_STATUS -ne 0 ]]; then
+          if [[ $? -ne 0 ]]; then
             TEMP_BRANCH="temp/hf-to-minor-$(date +%s)"
             git checkout -b "$TEMP_BRANCH"
             git push origin "$TEMP_BRANCH"
@@ -90,7 +88,6 @@ jobs:
             echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
             # Notify Google Chat
             curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $HF_BRANCH to $MINOR_BRANCH. Temporary branch created: $TEMP_BRANCH. Conflicting files: $CONFLICT_FILES\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
-            exit 1
           else
             git push origin "$MINOR_BRANCH"
           fi
@@ -113,10 +110,8 @@ jobs:
             git fetch origin "$MINOR_BRANCH:$MINOR_BRANCH"
           fi
           git merge --no-ff "$MINOR_BRANCH"
-          MERGE_STATUS=$?
-          echo "Merge status: $MERGE_STATUS"
           
-          if [[ $MERGE_STATUS -ne 0 ]]; then
+          if [[ $? -ne 0 ]]; then
             TEMP_BRANCH="temp/minor-to-master-$(date +%s)"
             git checkout -b "$TEMP_BRANCH"
             git push origin "$TEMP_BRANCH"
@@ -124,7 +119,6 @@ jobs:
             echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
             # Notify Google Chat
             curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $MINOR_BRANCH to master. Temporary branch created: $TEMP_BRANCH. Conflicting files: $CONFLICT_FILES\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
-            exit 1
           else
             git push origin master
           fi
