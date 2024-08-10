@@ -4,95 +4,69 @@ on:
   push:
     branches:
       - 'profit_dep_hf_*'
-      - 'profit_dep_minor_*'
 
 jobs:
-  auto-merge:
+  find_and_merge_branches:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Git
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
+    - name: Set up Git
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git config --global --add safe.directory /github/workspace
 
-      - name: Run auto merge script
-        env:
-          JEGANTOKEN: ${{ secrets.JEGANTOKEN }}
-          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
-        run: |
-          #!/usr/bin/env bash
-          set -o pipefail
+    - name: Find latest HF and minor branches
+      id: find_branches
+      run: |
+        # Find the latest HF branch
+        HF_BRANCH=$(git branch -r | grep "origin/profit_dep_hf_" | sort -r | head -n 1 | sed 's|origin/||')
+        echo "HF_BRANCH=$HF_BRANCH" >> $GITHUB_ENV
 
-          REPO_URL="https://github.com/egangithub1502/Jegan-Raja"
-          WORKDIR="/tmp/auto-merge"
-          mkdir -p "$WORKDIR"
-          cd "$WORKDIR" || exit
+        # Find the latest minor branch
+        MINOR_BRANCH=$(git branch -r | grep "origin/profit_dep_minor_" | sort -r | head -n 1 | sed 's|origin/||')
+        echo "MINOR_BRANCH=$MINOR_BRANCH" >> $GITHUB_ENV
 
-          git fetch origin
+    - name: Merge HF into minor
+      run: |
+        git checkout ${{ env.MINOR_BRANCH }}
+        git merge ${{ env.HF_BRANCH }} || {
+          echo "Conflict detected during merge from ${{ env.HF_BRANCH }} to ${{ env.MINOR_BRANCH }}";
+          git checkout -b temp_branch_hf_minor
+          git merge ${{ env.HF_BRANCH }}
+          echo "Creating pull request to resolve conflicts";
+          gh pr create --base ${{ env.MINOR_BRANCH }} --head temp_branch_hf_minor --title "Resolve conflicts between ${{ env.HF_BRANCH }} and ${{ env.MINOR_BRANCH }}" --body "Conflicts detected. Please resolve conflicts."
+          exit 1
+        }
+        git push origin ${{ env.MINOR_BRANCH }}
 
-          function merge_branches() {
-            local source_branch="$1"
-            local target_branch="$2"
+  merge_minor_to_master:
+    needs: find_and_merge_branches
+    runs-on: ubuntu-latest
+    if: success() # Proceed only if the previous job succeeded
 
-            # Clone the target branch
-            git clone --single-branch --branch "$target_branch" "$REPO_URL" "$target_branch"
-            cd "$target_branch" || exit
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-            # Initialize Git repository if needed
-            if [ ! -d ".git" ]; then
-              git init
-            fi
+    - name: Set up Git
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git config --global --add safe.directory /github/workspace
 
-            # Fetch source branch if not present
-            if ! git show-ref --quiet "refs/heads/$source_branch"; then
-              git fetch origin "$source_branch:$source_branch"
-            fi
-
-            # Merge source branch into target branch
-            git merge --no-ff "$source_branch"
-
-            if [[ $? -ne 0 ]]; then
-              TEMP_BRANCH="temp/$source_branch-to-$target_branch-$(date +%s)"
-              git checkout -b "$TEMP_BRANCH"
-              git push origin "$TEMP_BRANCH"
-              echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
-              curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $source_branch to $target_branch. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
-              exit 1
-            else
-              git push origin "$target_branch"
-            fi
-
-            # Return to the working directory
-            cd "$WORKDIR" || exit
-          }
-
-          # Handle profit_dep_hf to profit_dep_minor and master merge
-          if [[ "$GITHUB_REF" == refs/heads/profit_dep_hf_* ]]; then
-            MINOR_BRANCH=$(fetch_branch 'profit_dep_minor_')
-            if [[ -z "$MINOR_BRANCH" ]]; then
-              echo "No minor branch found. Exiting."
-              exit 1
-            fi
-
-            merge_branches "$GITHUB_REF" "$MINOR_BRANCH"
-            merge_branches "$MINOR_BRANCH" "master"
-          fi
-
-          # Handle profit_dep_minor to master merge
-          if [[ "$GITHUB_REF" == refs/heads/profit_dep_minor_* ]]; then
-            merge_branches "$GITHUB_REF" "master"
-          fi
-        ```
-
-This revised script includes additional checks and steps to handle potential issues:
-
-* Initializes the Git repository if it doesn't exist.
-* Provides more explicit error handling (although it could be further improved).
-
-If you continue to face issues, please provide more details about the specific error messages or the actions you're trying to perform.
- 
-**Would you like to add more error handling or logging to the script?** 
+    - name: Merge minor into master
+      run: |
+        git checkout master
+        git merge ${{ env.MINOR_BRANCH }} || {
+          echo "Conflict detected during merge from ${{ env.MINOR_BRANCH }} to master";
+          git checkout -b temp_branch_minor_master
+          git merge ${{ env.MINOR_BRANCH }}
+          echo "Creating pull request to resolve conflicts";
+          gh pr create --base master --head temp_branch_minor_master --title "Resolve conflicts between ${{ env.MINOR_BRANCH }} and master" --body "Conflicts detected. Please resolve conflicts."
+          exit 1
+        }
+        git push origin master
