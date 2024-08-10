@@ -52,6 +52,14 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    - name: Fetch and checkout master branch
+      run: |
+        # Fetch all branches including master
+        git fetch origin master:master
+
+        # Checkout the master branch
+        git checkout master
+
     - name: Set up Git
       run: |
         git config user.name "GitHub Actions"
@@ -60,7 +68,6 @@ jobs:
 
     - name: Merge minor into master
       run: |
-        git checkout master
         git merge ${{ env.MINOR_BRANCH }} || {
           echo "Conflict detected during merge from ${{ env.MINOR_BRANCH }} to master";
           git checkout -b temp_branch_minor_master
