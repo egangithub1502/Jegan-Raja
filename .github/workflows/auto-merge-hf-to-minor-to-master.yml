@@ -18,7 +18,7 @@ jobs:
     - name: Set up Git for authentication
       run: |
         git config --global url."https://x-access-token:${{ secrets.JEGANTOKEN }}@github.com/".insteadOf "https://github.com/"
-
+        
     - name: Set up Git
       run: |
         # Configure Git with a default user
@@ -33,25 +33,21 @@ jobs:
         # Configure Git with the committer's information
         git config user.name "$COMMITTER_NAME"
         git config user.email "$COMMITTER_EMAIL"
-
+        
     - name: Run auto merge script
       env:
         JEGANTOKEN: ${{ secrets.JEGANTOKEN }}
-        GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
       run: |
         #!/usr/bin/env bash
         set -o pipefail
         # Configuration
         REPO_URL="https://github.com/egangithub1502/Jegan-Raja"
         GH_TOKEN="${JEGANTOKEN}"
-        GOOGLE_CHAT_WEBHOOK_URL="${GOOGLE_CHAT_WEBHOOK_URL}"
+        GOOGLE_CHAT_WEBHOOK_URL="${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}"
         # Functions
         function fetch_branch() {
           local pattern=$1
           git branch -r | grep "origin/$pattern" | tail -n 1 | sed 's|origin/||' | xargs
-        }
-        function get_conflicting_files() {
-          git status --porcelain | grep "^UU " | sed 's/^UU //' | xargs
         }
         # Main Script
         # Step 1: Check out the repo and set up Git
@@ -79,17 +75,14 @@ jobs:
           fi
           
           git merge --no-ff "$HF_BRANCH"
-          MERGE_STATUS=$?
-          echo "Merge status: $MERGE_STATUS"
           
-          if [[ $MERGE_STATUS -ne 0 ]]; then
+          if [[ $? -ne 0 ]]; then
             TEMP_BRANCH="temp/hf-to-minor-$(date +%s)"
             git checkout -b "$TEMP_BRANCH"
             git push origin "$TEMP_BRANCH"
-            CONFLICT_FILES=$(get_conflicting_files)
             echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
             # Notify Google Chat
-            curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $HF_BRANCH to $MINOR_BRANCH. Temporary branch created: $TEMP_BRANCH. Conflicting files: $CONFLICT_FILES\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
+            curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $HF_BRANCH to $MINOR_BRANCH. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
             exit 1
           else
             git push origin "$MINOR_BRANCH"
@@ -113,17 +106,14 @@ jobs:
             git fetch origin "$MINOR_BRANCH:$MINOR_BRANCH"
           fi
           git merge --no-ff "$MINOR_BRANCH"
-          MERGE_STATUS=$?
-          echo "Merge status: $MERGE_STATUS"
           
-          if [[ $MERGE_STATUS -ne 0 ]]; then
+          if [[ $? -ne 0 ]]; then
             TEMP_BRANCH="temp/minor-to-master-$(date +%s)"
             git checkout -b "$TEMP_BRANCH"
             git push origin "$TEMP_BRANCH"
-            CONFLICT_FILES=$(get_conflicting_files)
             echo "Conflict detected. Temporary branch created: $TEMP_BRANCH"
             # Notify Google Chat
-            curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $MINOR_BRANCH to master. Temporary branch created: $TEMP_BRANCH. Conflicting files: $CONFLICT_FILES\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
+            curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Conflict detected during merge from $MINOR_BRANCH to master. Temporary branch created: $TEMP_BRANCH\"}" "$GOOGLE_CHAT_WEBHOOK_URL"
             exit 1
           else
             git push origin master
